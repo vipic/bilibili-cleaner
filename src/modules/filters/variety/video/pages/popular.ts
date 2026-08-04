@@ -5,6 +5,7 @@ import { ContextMenuTargetHandler, FilterContextMenu, IMainFilter, SelectorResul
 import { logger } from '@/utils/logger'
 import { isPagePopular } from '@/utils/pageType'
 import { GM_getValue, GM_setValue } from '$'
+import { promptKeyword } from '@/utils/keywordPrompt'
 import { calcQuality, matchBvid, orderedUniq, showEle, waitForEle } from '@/utils/tool'
 import {
     VideoBvidFilter,
@@ -136,17 +137,15 @@ class VideoFilterPopular implements IMainFilter {
             return
         }
         let revertAll = false
-        if (
-            !(
-                this.videoBvidFilter.isEnable ||
-                this.videoDurationFilter.isEnable ||
-                this.videoTitleFilter.isEnable ||
-                this.videoUploaderFilter.isEnable ||
-                this.videoUploaderKeywordFilter.isEnable ||
-                this.videoDimensionFilter.isEnable ||
-                this.videoQualityFilter.isEnable
-            )
-        ) {
+        if (!(
+            this.videoBvidFilter.isEnable ||
+            this.videoDurationFilter.isEnable ||
+            this.videoTitleFilter.isEnable ||
+            this.videoUploaderFilter.isEnable ||
+            this.videoUploaderKeywordFilter.isEnable ||
+            this.videoDimensionFilter.isEnable ||
+            this.videoQualityFilter.isEnable
+        )) {
             revertAll = true
         }
         const timer = performance.now()
@@ -310,7 +309,7 @@ export const videoFilterPopularGroups: Group[] = [
             {
                 type: 'switch',
                 id: GM_KEYS.black.uploaderKeyword.statusKey,
-                name: '启用 UP主昵称关键词过滤',
+                name: '启用 UP主昵称关键词过滤 (右键单击UP主)',
                 noStyle: true,
                 enableFn: () => {
                     mainFilter.videoUploaderKeywordFilter.enable()
@@ -325,6 +324,7 @@ export const videoFilterPopularGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.uploaderKeyword.valueKey,
                 name: '编辑 UP主昵称关键词黑名单',
+                description: ['右键可快捷录入关键词，确认后出现在首行'],
                 editorTitle: 'UP主昵称关键词 黑名单',
                 editorDescription: [
                     '每行一个关键词或正则，不区分大小写、全半角',
@@ -396,7 +396,7 @@ export const videoFilterPopularGroups: Group[] = [
             {
                 type: 'switch',
                 id: GM_KEYS.black.title.statusKey,
-                name: '启用 标题关键词过滤',
+                name: '启用 标题关键词过滤 (右键单击标题)',
                 noStyle: true,
                 enableFn: () => {
                     mainFilter.videoTitleFilter.enable()
@@ -411,6 +411,7 @@ export const videoFilterPopularGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.title.valueKey,
                 name: '编辑 标题关键词黑名单',
+                description: ['右键可快捷录入关键词，确认后出现在首行'],
                 editorTitle: '标题关键词 黑名单',
                 editorDescription: [
                     '每行一个关键词或正则，不区分大小写、全半角',
@@ -544,6 +545,29 @@ export const videoFilterPopularHandler: ContextMenuTargetHandler = (target: HTML
                     },
                 })
             }
+            if (mainFilter.videoUploaderKeywordFilter.isEnable) {
+                menus.push({
+                    name: `录入UP主昵称关键词`,
+                    fn: async () => {
+                        try {
+                            const keyword = await promptKeyword({
+                                title: '录入UP主昵称关键词',
+                                initialValue: uploader,
+                            })
+                            if (!keyword) {
+                                return
+                            }
+                            mainFilter.videoUploaderKeywordFilter.addParam(keyword)
+                            mainFilter.checkFull()
+                            const arr: string[] = GM_getValue(GM_KEYS.black.uploaderKeyword.valueKey, [])
+                            arr.unshift(keyword)
+                            GM_setValue(GM_KEYS.black.uploaderKeyword.valueKey, orderedUniq(arr))
+                        } catch (err) {
+                            logger.error(`videoFilterPopularHandler add uploader keyword failed`, err)
+                        }
+                    },
+                })
+            }
             if (mainFilter.videoUploaderWhiteFilter.isEnable) {
                 menus.push({
                     name: `将UP主加入白名单`,
@@ -560,6 +584,33 @@ export const videoFilterPopularHandler: ContextMenuTargetHandler = (target: HTML
                     },
                 })
             }
+        }
+    }
+    // 标题关键词（仅标题，不含封面）
+    if ((target.classList.contains('title') && target.closest('.info a')) || target.classList.contains('video-name')) {
+        const title = target.getAttribute('title')?.trim() || target.textContent?.trim()
+        if (title && mainFilter.videoTitleFilter.isEnable) {
+            menus.push({
+                name: `录入标题关键词`,
+                fn: async () => {
+                    try {
+                        const keyword = await promptKeyword({
+                            title: '录入标题关键词',
+                            initialValue: title,
+                        })
+                        if (!keyword) {
+                            return
+                        }
+                        mainFilter.videoTitleFilter.addParam(keyword)
+                        mainFilter.checkFull()
+                        const arr: string[] = GM_getValue(GM_KEYS.black.title.valueKey, [])
+                        arr.unshift(keyword)
+                        GM_setValue(GM_KEYS.black.title.valueKey, orderedUniq(arr))
+                    } catch (err) {
+                        logger.error(`videoFilterPopularHandler add title keyword failed`, err)
+                    }
+                },
+            })
         }
     }
     // BVID

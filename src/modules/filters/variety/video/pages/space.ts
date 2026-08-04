@@ -5,6 +5,7 @@ import { ContextMenuTargetHandler, FilterContextMenu, IMainFilter, SelectorResul
 import { logger } from '@/utils/logger'
 import { isPageSpace } from '@/utils/pageType'
 import { GM_getValue, GM_setValue } from '$'
+import { promptKeyword } from '@/utils/keywordPrompt'
 import { convertTimeToSec, matchBvid, orderedUniq, showEle, waitForEle } from '@/utils/tool'
 import { VideoBvidFilter, VideoDurationFilter, VideoTitleFilter } from '../subFilters/black'
 import { VideoTitleWhiteFilter } from '../subFilters/white'
@@ -227,7 +228,7 @@ export const videoFilterSpaceGroups: Group[] = [
             {
                 type: 'switch',
                 id: GM_KEYS.black.title.statusKey,
-                name: '启用 标题关键词过滤',
+                name: '启用 标题关键词过滤 (右键单击标题)',
                 noStyle: true,
                 enableFn: () => {
                     mainFilter.videoTitleFilter.enable()
@@ -242,6 +243,7 @@ export const videoFilterSpaceGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.title.valueKey,
                 name: '编辑 标题关键词黑名单',
+                description: ['右键可快捷录入关键词，确认后出现在首行'],
                 editorTitle: '标题关键词 黑名单',
                 editorDescription: [
                     '每行一个关键词或正则，不区分大小写、全半角',
@@ -329,9 +331,38 @@ export const videoFilterSpaceHandler: ContextMenuTargetHandler = (target: HTMLEl
     }
 
     const menus: FilterContextMenu[] = []
-    // BVID
+    // 标题 / BVID
     if (target.closest('.bili-video-card__title')) {
-        const url = (target as HTMLAnchorElement).href
+        const titleEl = target.closest('.bili-video-card__title')
+        const title =
+            titleEl?.querySelector('a')?.getAttribute('title')?.trim() ||
+            (target as HTMLAnchorElement).title?.trim() ||
+            titleEl?.textContent?.trim() ||
+            target.textContent?.trim()
+        if (title && mainFilter.videoTitleFilter.isEnable) {
+            menus.push({
+                name: `录入标题关键词`,
+                fn: async () => {
+                    try {
+                        const keyword = await promptKeyword({
+                            title: '录入标题关键词',
+                            initialValue: title,
+                        })
+                        if (!keyword) {
+                            return
+                        }
+                        mainFilter.videoTitleFilter.addParam(keyword)
+                        mainFilter.checkFull()
+                        const arr: string[] = GM_getValue(GM_KEYS.black.title.valueKey, [])
+                        arr.unshift(keyword)
+                        GM_setValue(GM_KEYS.black.title.valueKey, orderedUniq(arr))
+                    } catch (err) {
+                        logger.error(`videoFilterSpaceHandler add title keyword failed`, err)
+                    }
+                },
+            })
+        }
+        const url = (target as HTMLAnchorElement).href || titleEl?.querySelector('a')?.href
         if (url && mainFilter.videoBvidFilter.isEnable) {
             const bvid = matchBvid(url)
             if (bvid) {
@@ -345,7 +376,7 @@ export const videoFilterSpaceHandler: ContextMenuTargetHandler = (target: HTMLEl
                             arr.unshift(bvid)
                             GM_setValue(GM_KEYS.black.bvid.valueKey, orderedUniq(arr))
                         } catch (err) {
-                            logger.error(`videoFilterSearchHandler add bvid ${bvid} failed`, err)
+                            logger.error(`videoFilterSpaceHandler add bvid ${bvid} failed`, err)
                         }
                     },
                 })

@@ -5,6 +5,7 @@ import { ContextMenuTargetHandler, FilterContextMenu, IMainFilter, SelectorResul
 import { logger } from '@/utils/logger'
 import { isPageChannel } from '@/utils/pageType'
 import { GM_getValue, GM_setValue } from '$'
+import { promptKeyword } from '@/utils/keywordPrompt'
 import { convertDateToDays, convertTimeToSec, matchBvid, orderedUniq, showEle, waitForEle } from '@/utils/tool'
 import {
     VideoBvidFilter,
@@ -128,16 +129,14 @@ class VideoFilterChannel implements IMainFilter {
             return
         }
         let revertAll = false
-        if (
-            !(
-                this.videoBvidFilter.isEnable ||
-                this.videoDurationFilter.isEnable ||
-                this.videoTitleFilter.isEnable ||
-                this.videoUploaderFilter.isEnable ||
-                this.videoUploaderKeywordFilter.isEnable ||
-                this.videoPubdateFilter.isEnable
-            )
-        ) {
+        if (!(
+            this.videoBvidFilter.isEnable ||
+            this.videoDurationFilter.isEnable ||
+            this.videoTitleFilter.isEnable ||
+            this.videoUploaderFilter.isEnable ||
+            this.videoUploaderKeywordFilter.isEnable ||
+            this.videoPubdateFilter.isEnable
+        )) {
             revertAll = true
         }
         const timer = performance.now()
@@ -302,7 +301,7 @@ export const videoFilterChannelGroups: Group[] = [
             {
                 type: 'switch',
                 id: GM_KEYS.black.uploaderKeyword.statusKey,
-                name: '启用 UP主昵称关键词过滤',
+                name: '启用 UP主昵称关键词过滤 (右键单击UP主)',
                 noStyle: true,
                 enableFn: () => {
                     mainFilter.videoUploaderKeywordFilter.enable()
@@ -317,6 +316,7 @@ export const videoFilterChannelGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.uploaderKeyword.valueKey,
                 name: '编辑 UP主昵称关键词黑名单',
+                description: ['右键可快捷录入关键词，确认后出现在首行'],
                 editorTitle: 'UP主昵称关键词 黑名单',
                 editorDescription: [
                     '每行一个关键词或正则，不区分大小写、全半角',
@@ -338,7 +338,7 @@ export const videoFilterChannelGroups: Group[] = [
             {
                 type: 'switch',
                 id: GM_KEYS.black.title.statusKey,
-                name: '启用 标题关键词过滤',
+                name: '启用 标题关键词过滤 (右键单击标题)',
                 noStyle: true,
                 enableFn: () => {
                     mainFilter.videoTitleFilter.enable()
@@ -353,6 +353,7 @@ export const videoFilterChannelGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.title.valueKey,
                 name: '编辑 标题关键词黑名单',
+                description: ['右键可快捷录入关键词，确认后出现在首行'],
                 editorTitle: '标题关键词 黑名单',
                 editorDescription: [
                     '每行一个关键词或正则，不区分大小写、全半角',
@@ -529,6 +530,29 @@ export const videoFilterChannelHandler: ContextMenuTargetHandler = (target: HTML
                     },
                 })
             }
+            if (mainFilter.videoUploaderKeywordFilter.isEnable) {
+                menus.push({
+                    name: `录入UP主昵称关键词`,
+                    fn: async () => {
+                        try {
+                            const keyword = await promptKeyword({
+                                title: '录入UP主昵称关键词',
+                                initialValue: uploader,
+                            })
+                            if (!keyword) {
+                                return
+                            }
+                            mainFilter.videoUploaderKeywordFilter.addParam(keyword)
+                            mainFilter.checkFull()
+                            const arr: string[] = GM_getValue(GM_KEYS.black.uploaderKeyword.valueKey, [])
+                            arr.unshift(keyword)
+                            GM_setValue(GM_KEYS.black.uploaderKeyword.valueKey, orderedUniq(arr))
+                        } catch (err) {
+                            logger.error(`videoFilterChannelHandler add uploader keyword failed`, err)
+                        }
+                    },
+                })
+            }
             if (mainFilter.videoUploaderWhiteFilter.isEnable) {
                 menus.push({
                     name: `将UP主加入白名单`,
@@ -546,7 +570,12 @@ export const videoFilterChannelHandler: ContextMenuTargetHandler = (target: HTML
                 })
             }
         }
-        if (spaceUrl && (mainFilter.videoUploaderFilter.isEnable || mainFilter.videoUploaderWhiteFilter.isEnable)) {
+        if (
+            spaceUrl &&
+            (mainFilter.videoUploaderFilter.isEnable ||
+                mainFilter.videoUploaderKeywordFilter.isEnable ||
+                mainFilter.videoUploaderWhiteFilter.isEnable)
+        ) {
             menus.push({
                 name: `复制主页链接`,
                 fn: async () => {
@@ -555,9 +584,37 @@ export const videoFilterChannelHandler: ContextMenuTargetHandler = (target: HTML
             })
         }
     }
-    // BVID
-    if (target instanceof HTMLAnchorElement && target.closest('.bili-video-card__title')) {
-        const url = target.closest('.bili-video-card__title')?.querySelector('a')?.href
+    // 标题 / BVID
+    if (target.closest('.bili-video-card__title')) {
+        const titleEl = target.closest('.bili-video-card__title')
+        const title =
+            titleEl?.querySelector('a')?.getAttribute('title')?.trim() ||
+            titleEl?.querySelector('a')?.textContent?.trim() ||
+            titleEl?.textContent?.trim()
+        if (title && mainFilter.videoTitleFilter.isEnable) {
+            menus.push({
+                name: `录入标题关键词`,
+                fn: async () => {
+                    try {
+                        const keyword = await promptKeyword({
+                            title: '录入标题关键词',
+                            initialValue: title,
+                        })
+                        if (!keyword) {
+                            return
+                        }
+                        mainFilter.videoTitleFilter.addParam(keyword)
+                        mainFilter.checkFull()
+                        const arr: string[] = GM_getValue(GM_KEYS.black.title.valueKey, [])
+                        arr.unshift(keyword)
+                        GM_setValue(GM_KEYS.black.title.valueKey, orderedUniq(arr))
+                    } catch (err) {
+                        logger.error(`videoFilterChannelHandler add title keyword failed`, err)
+                    }
+                },
+            })
+        }
+        const url = titleEl?.querySelector('a')?.href
         if (url && mainFilter.videoBvidFilter.isEnable) {
             const bvid = matchBvid(url)
             if (bvid) {
