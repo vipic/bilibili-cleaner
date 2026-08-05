@@ -25,7 +25,7 @@
                     @keydown.esc.stop.prevent="store.cancel()"
                     class="block w-full rounded-md border-2 border-gray-300 bg-white px-3 py-2 outline-hidden focus:border-[#00AEEC]"
                     spellcheck="false"
-                    placeholder="输入关键词..."
+                    placeholder="输入关键词，多个用 | 分隔"
                 />
                 <div class="flex justify-end gap-2">
                     <button

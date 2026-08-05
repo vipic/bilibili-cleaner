@@ -624,17 +624,19 @@ export const videoFilterHomepageHandler: ContextMenuTargetHandler = (target: HTM
                     name: `录入UP主昵称关键词`,
                     fn: async () => {
                         try {
-                            const keyword = await promptKeyword({
+                            const keywords = await promptKeyword({
                                 title: '录入UP主昵称关键词',
                                 initialValue: uploader,
                             })
-                            if (!keyword) {
+                            if (!keywords) {
                                 return
                             }
-                            mainFilter.videoUploaderKeywordFilter.addParam(keyword)
+                            for (const keyword of keywords) {
+                                mainFilter.videoUploaderKeywordFilter.addParam(keyword)
+                            }
                             mainFilter.checkFull()
                             const arr: string[] = GM_getValue(GM_KEYS.black.uploaderKeyword.valueKey, [])
-                            arr.unshift(keyword)
+                            arr.unshift(...keywords)
                             GM_setValue(GM_KEYS.black.uploaderKeyword.valueKey, orderedUniq(arr))
                         } catch (err) {
                             logger.error(`videoFilterHomepageHandler add uploader keyword failed`, err)
@@ -684,17 +686,19 @@ export const videoFilterHomepageHandler: ContextMenuTargetHandler = (target: HTM
                 name: `录入标题关键词`,
                 fn: async () => {
                     try {
-                        const keyword = await promptKeyword({
+                        const keywords = await promptKeyword({
                             title: '录入标题关键词',
                             initialValue: title,
                         })
-                        if (!keyword) {
+                        if (!keywords) {
                             return
                         }
-                        mainFilter.videoTitleFilter.addParam(keyword)
+                        for (const keyword of keywords) {
+                            mainFilter.videoTitleFilter.addParam(keyword)
+                        }
                         mainFilter.checkFull()
                         const arr: string[] = GM_getValue(GM_KEYS.black.title.valueKey, [])
-                        arr.unshift(keyword)
+                        arr.unshift(...keywords)
                         GM_setValue(GM_KEYS.black.title.valueKey, orderedUniq(arr))
                     } catch (err) {
                         logger.error(`videoFilterHomepageHandler add title keyword failed`, err)
