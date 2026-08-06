@@ -2,9 +2,8 @@ import { BooleanFilter } from '@/modules/filters/core/subFilters/booleanFilter'
 import { KeywordFilter } from '@/modules/filters/core/subFilters/keywordFilter'
 import { NumberMaxFilter } from '@/modules/filters/core/subFilters/numberMaxFilter'
 import { NumberMinFilter } from '@/modules/filters/core/subFilters/numberMinFilter'
+import { PartitionFilter } from '@/modules/filters/core/subFilters/partitionFilter'
 import { StringFilter } from '@/modules/filters/core/subFilters/stringFilter'
-
-export class VideoBvidFilter extends StringFilter {}
 
 export class VideoDimensionFilter extends BooleanFilter {}
 
@@ -21,3 +20,5 @@ export class VideoUploaderFilter extends StringFilter {}
 export class VideoUploaderKeywordFilter extends KeywordFilter {}
 
 export class VideoViewsFilter extends NumberMinFilter {}
+
+export class VideoPartitionFilter extends PartitionFilter {}

@@ -137,7 +137,32 @@ export const articleFilters: Filter[] = [
 export const loadFilterStyle = () => {
     const style = document.createElement('style')
     style.className = `bili-cleaner-css filter`
-    style.textContent = `:is(body, #app, #i_cecream) [${config.filterHideSign}] {display: none !important;}`
+    style.textContent = `:is(body, #app, #i_cecream) [${config.filterHideSign}] {display: none !important;}
+.bili-cleaner-partition-tag {
+    display: block;
+    width: fit-content;
+    margin: 3px 0;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 16px;
+    color: #ea580c;
+    border: 1px solid #f97316;
+    user-select: none;
+}
+/* 首页：标签在昵称行内，改为行内并增加与前后元素的间距 */
+.bili-video-card__info--owner .bili-cleaner-partition-tag {
+    display: inline-block;
+    width: auto;
+    margin: 0 6px 0 8px;
+}
+/* 分区标签存在时，热门页/播放页 昵称与播放量上下排列 */
+.bili-cleaner-partition-tag ~ .up-name,
+.bili-cleaner-partition-tag ~ .video-stat,
+.bili-cleaner-partition-tag ~ .upname,
+.bili-cleaner-partition-tag ~ .play {
+    display: block;
+}`
     document.documentElement?.appendChild(style)
 }
 

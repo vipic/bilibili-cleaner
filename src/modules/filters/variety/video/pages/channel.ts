@@ -6,16 +6,15 @@ import { logger } from '@/utils/logger'
 import { isPageChannel } from '@/utils/pageType'
 import { GM_getValue, GM_setValue } from '$'
 import { promptKeyword } from '@/utils/keywordPrompt'
-import { convertDateToDays, convertTimeToSec, matchBvid, orderedUniq, showEle, waitForEle } from '@/utils/tool'
+import { convertDateToDays, convertTimeToSec, orderedUniq, showEle, waitForEle } from '@/utils/tool'
 import {
-    VideoBvidFilter,
     VideoDurationFilter,
     VideoPubdateFilter,
     VideoTitleFilter,
     VideoUploaderFilter,
     VideoUploaderKeywordFilter,
 } from '../subFilters/black'
-import { VideoTitleWhiteFilter, VideoUploaderWhiteFilter } from '../subFilters/white'
+import { VideoUploaderWhiteFilter } from '../subFilters/white'
 
 const GM_KEYS = {
     black: {
@@ -31,10 +30,6 @@ const GM_KEYS = {
             statusKey: 'channel-uploader-keyword-filter-status',
             valueKey: 'global-uploader-keyword-filter-value',
         },
-        bvid: {
-            statusKey: 'channel-bvid-filter-status',
-            valueKey: 'global-bvid-filter-value',
-        },
         pubdate: {
             statusKey: 'channel-pubdate-filter-status',
             valueKey: 'global-pubdate-filter-value',
@@ -48,10 +43,6 @@ const GM_KEYS = {
         uploader: {
             statusKey: 'channel-uploader-whitelist-filter-status',
             valueKey: 'global-uploader-whitelist-filter-value',
-        },
-        title: {
-            statusKey: 'channel-title-keyword-whitelist-filter-status',
-            valueKey: 'global-title-keyword-whitelist-filter-value',
         },
     },
 }
@@ -79,12 +70,6 @@ const selectorFns = {
         }
         return undefined
     },
-    bvid: (video: HTMLElement): SelectorResult => {
-        const href =
-            video.querySelector('.bili-video-card__title a')?.getAttribute('href') ||
-            video.querySelector('.bili-cover-card')?.getAttribute('href')
-        return (href && matchBvid(href)) ?? undefined
-    },
     uploader: (video: HTMLElement): SelectorResult => {
         const text = video
             .querySelector('.bili-video-card__author .bili-video-card__text:nth-child(2)')
@@ -100,7 +85,6 @@ class VideoFilterChannel implements IMainFilter {
     target: HTMLElement | undefined
 
     // 黑名单
-    videoBvidFilter = new VideoBvidFilter()
     videoDurationFilter = new VideoDurationFilter()
     videoTitleFilter = new VideoTitleFilter()
     videoPubdateFilter = new VideoPubdateFilter()
@@ -109,11 +93,9 @@ class VideoFilterChannel implements IMainFilter {
 
     // 白名单
     videoUploaderWhiteFilter = new VideoUploaderWhiteFilter()
-    videoTitleWhiteFilter = new VideoTitleWhiteFilter()
 
     init() {
         // 黑名单
-        this.videoBvidFilter.setParam(GM_getValue(GM_KEYS.black.bvid.valueKey, []))
         this.videoDurationFilter.setParam(GM_getValue(GM_KEYS.black.duration.valueKey, 0))
         this.videoTitleFilter.setParam(GM_getValue(GM_KEYS.black.title.valueKey, []))
         this.videoPubdateFilter.setParam(GM_getValue(GM_KEYS.black.pubdate.valueKey, 0))
@@ -121,7 +103,6 @@ class VideoFilterChannel implements IMainFilter {
         this.videoUploaderKeywordFilter.setParam(GM_getValue(GM_KEYS.black.uploaderKeyword.valueKey, []))
         // 白名单
         this.videoUploaderWhiteFilter.setParam(GM_getValue(GM_KEYS.white.uploader.valueKey, []))
-        this.videoTitleWhiteFilter.setParam(GM_getValue(GM_KEYS.white.title.valueKey, []))
     }
 
     async check(mode?: 'full' | 'incr') {
@@ -130,7 +111,6 @@ class VideoFilterChannel implements IMainFilter {
         }
         let revertAll = false
         if (!(
-            this.videoBvidFilter.isEnable ||
             this.videoDurationFilter.isEnable ||
             this.videoTitleFilter.isEnable ||
             this.videoUploaderFilter.isEnable ||
@@ -160,7 +140,6 @@ class VideoFilterChannel implements IMainFilter {
                 logger.debug(
                     [
                         `VideoFilterChannel`,
-                        `bvid: ${selectorFns.bvid(v)}`,
                         `duration: ${selectorFns.duration(v)}`,
                         `title: ${selectorFns.title(v)}`,
                         `uploader: ${selectorFns.uploader(v)}`,
@@ -181,13 +160,9 @@ class VideoFilterChannel implements IMainFilter {
 
         const whitePairs: SubFilterPair[] = []
         this.videoUploaderWhiteFilter.isEnable && whitePairs.push([this.videoUploaderWhiteFilter, selectorFns.uploader])
-        this.videoTitleWhiteFilter.isEnable && whitePairs.push([this.videoTitleWhiteFilter, selectorFns.title])
-
-        const forceBlackPairs: SubFilterPair[] = []
-        this.videoBvidFilter.isEnable && forceBlackPairs.push([this.videoBvidFilter, selectorFns.bvid])
 
         // 检测
-        const blackCnt = await coreCheck(videos, true, 'sign', blackPairs, whitePairs, forceBlackPairs)
+        const blackCnt = await coreCheck(videos, true, 'sign', blackPairs, whitePairs)
         const time = (performance.now() - timer).toFixed(1)
         logger.debug(`VideoFilterChannel hide ${blackCnt} in ${videos.length} videos, mode=${mode}, time=${time}`)
     }
@@ -368,37 +343,6 @@ export const videoFilterChannelGroups: Group[] = [
         ],
     },
     {
-        name: 'BV号过滤',
-        items: [
-            {
-                type: 'switch',
-                id: GM_KEYS.black.bvid.statusKey,
-                name: '启用 BV号过滤 (右键单击标题)',
-                noStyle: true,
-                enableFn: () => {
-                    mainFilter.videoBvidFilter.enable()
-                    mainFilter.checkFull()
-                },
-                disableFn: () => {
-                    mainFilter.videoBvidFilter.disable()
-                    mainFilter.checkFull()
-                },
-            },
-            {
-                type: 'editor',
-                id: GM_KEYS.black.bvid.valueKey,
-                name: '编辑 BV号黑名单',
-                description: ['右键屏蔽的BV号会出现在首行'],
-                editorTitle: 'BV号 黑名单',
-                editorDescription: ['每行一个BV号，保存时自动去重'],
-                saveFn: async () => {
-                    mainFilter.videoBvidFilter.setParam(GM_getValue(GM_KEYS.black.bvid.valueKey, []))
-                    mainFilter.checkFull()
-                },
-            },
-        ],
-    },
-    {
         name: '发布日期过滤',
         fold: true,
         items: [
@@ -460,35 +404,6 @@ export const videoFilterChannelGroups: Group[] = [
                 editorDescription: ['每行一个UP主昵称，保存时自动去重'],
                 saveFn: async () => {
                     mainFilter.videoUploaderWhiteFilter.setParam(GM_getValue(GM_KEYS.white.uploader.valueKey, []))
-                    mainFilter.checkFull()
-                },
-            },
-            {
-                type: 'switch',
-                id: GM_KEYS.white.title.statusKey,
-                name: '启用 标题关键词白名单',
-                noStyle: true,
-                enableFn: () => {
-                    mainFilter.videoTitleWhiteFilter.enable()
-                    mainFilter.checkFull()
-                },
-                disableFn: () => {
-                    mainFilter.videoTitleWhiteFilter.disable()
-                    mainFilter.checkFull()
-                },
-            },
-            {
-                type: 'editor',
-                id: GM_KEYS.white.title.valueKey,
-                name: '编辑 标题关键词白名单',
-                editorTitle: '标题关键词 白名单',
-                editorDescription: [
-                    '每行一个关键词或正则，不区分大小写、全半角',
-                    '请勿使用过于激进的关键词或正则',
-                    '正则默认 ius 模式，无需 flag，语法：/abc|\\d+/',
-                ],
-                saveFn: async () => {
-                    mainFilter.videoTitleWhiteFilter.setParam(GM_getValue(GM_KEYS.white.title.valueKey, []))
                     mainFilter.checkFull()
                 },
             },
@@ -617,32 +532,6 @@ export const videoFilterChannelHandler: ContextMenuTargetHandler = (target: HTML
                     }
                 },
             })
-        }
-        const url = titleEl?.querySelector('a')?.href
-        if (url && mainFilter.videoBvidFilter.isEnable) {
-            const bvid = matchBvid(url)
-            if (bvid) {
-                menus.push({
-                    name: `屏蔽视频 ${bvid}`,
-                    fn: async () => {
-                        try {
-                            mainFilter.videoBvidFilter.addParam(bvid)
-                            mainFilter.checkFull()
-                            const arr: string[] = GM_getValue(GM_KEYS.black.bvid.valueKey, [])
-                            arr.unshift(bvid)
-                            GM_setValue(GM_KEYS.black.bvid.valueKey, orderedUniq(arr))
-                        } catch (err) {
-                            logger.error(`videoFilterChannelHandler add bvid ${bvid} failed`, err)
-                        }
-                    },
-                })
-                menus.push({
-                    name: '复制视频链接',
-                    fn: async () => {
-                        navigator.clipboard.writeText(`https://www.bilibili.com/video/${bvid}`).catch(() => {})
-                    },
-                })
-            }
         }
     }
     return menus

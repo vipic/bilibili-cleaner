@@ -8,15 +8,17 @@ import { GM_getValue, GM_setValue } from '$'
 import { promptKeyword } from '@/utils/keywordPrompt'
 import { convertDateToDays, convertTimeToSec, matchBvid, orderedUniq, showEle, waitForEle } from '@/utils/tool'
 import {
-    VideoBvidFilter,
     VideoDurationFilter,
+    VideoPartitionFilter,
     VideoPubdateFilter,
     VideoTitleFilter,
     VideoUploaderFilter,
     VideoUploaderKeywordFilter,
     VideoViewsFilter,
 } from '../subFilters/black'
-import { VideoIsFollowWhiteFilter, VideoTitleWhiteFilter, VideoUploaderWhiteFilter } from '../subFilters/white'
+import { VideoIsFollowWhiteFilter, VideoUploaderWhiteFilter } from '../subFilters/white'
+import { buildPartitionContextMenus, parsePartitionValue, setPartitionTag } from '../partition'
+import { ensurePartition, getPartition } from '../homepagePartition'
 
 const GM_KEYS = {
     black: {
@@ -36,10 +38,6 @@ const GM_KEYS = {
             statusKey: 'homepage-uploader-keyword-filter-status',
             valueKey: 'global-uploader-keyword-filter-value',
         },
-        bvid: {
-            statusKey: 'homepage-bvid-filter-status',
-            valueKey: 'global-bvid-filter-value',
-        },
         pubdate: {
             statusKey: 'homepage-pubdate-filter-status',
             valueKey: 'global-pubdate-filter-value',
@@ -48,15 +46,18 @@ const GM_KEYS = {
             statusKey: 'homepage-title-keyword-filter-status',
             valueKey: 'global-title-keyword-filter-value',
         },
+        partition: {
+            statusKey: 'homepage-partition-filter-status',
+            valueKey: 'global-partition-filter-value',
+        },
+        partitionTag: {
+            statusKey: 'homepage-partition-tag-status',
+        },
     },
     white: {
         uploader: {
             statusKey: 'homepage-uploader-whitelist-filter-status',
             valueKey: 'global-uploader-whitelist-filter-value',
-        },
-        title: {
-            statusKey: 'homepage-title-keyword-whitelist-filter-status',
-            valueKey: 'global-title-keyword-whitelist-filter-value',
         },
         isFollow: {
             statusKey: 'homepage-following-whitelist-filter-status',
@@ -92,11 +93,17 @@ const selectorFns = {
     bvid: (video: HTMLElement): SelectorResult => {
         const href =
             video.querySelector('.bili-video-card__info--tit a')?.getAttribute('href') ||
-            video.querySelector('.bili-video-card__image--link')?.getAttribute('href')
+            video.querySelector('.bili-video-card__image--link')?.getAttribute('href') ||
+            video.querySelector('a[href*="/video/"]')?.getAttribute('href') ||
+            video.getAttribute('href')
         return (href && matchBvid(href)) ?? undefined
     },
     uploader: (video: HTMLElement): SelectorResult => {
         return video.querySelector('.bili-video-card__info--author')?.textContent?.trim()
+    },
+    partition: (video: HTMLElement): SelectorResult => {
+        const bvid = selectorFns.bvid(video)
+        return typeof bvid === 'string' ? getPartition(bvid) : undefined
     },
     isFollow: (video: HTMLElement): SelectorResult => {
         return video.querySelector('.bili-video-card__info--icon-text')?.textContent?.trim() === '已关注'
@@ -107,31 +114,31 @@ class VideoFilterHomepage implements IMainFilter {
     target: HTMLElement | undefined
 
     // 黑名单
-    videoBvidFilter = new VideoBvidFilter()
     videoDurationFilter = new VideoDurationFilter()
     videoViewsFilter = new VideoViewsFilter()
     videoTitleFilter = new VideoTitleFilter()
     videoPubdateFilter = new VideoPubdateFilter()
     videoUploaderFilter = new VideoUploaderFilter()
     videoUploaderKeywordFilter = new VideoUploaderKeywordFilter()
+    videoPartitionFilter = new VideoPartitionFilter()
+    // 显示分区标签
+    showPartitionTag = false
 
     // 白名单
     videoUploaderWhiteFilter = new VideoUploaderWhiteFilter()
-    videoTitleWhiteFilter = new VideoTitleWhiteFilter()
     videoIsFollowWhiteFilter = new VideoIsFollowWhiteFilter()
 
     init() {
         // 黑名单
-        this.videoBvidFilter.setParam(GM_getValue(GM_KEYS.black.bvid.valueKey, []))
         this.videoDurationFilter.setParam(GM_getValue(GM_KEYS.black.duration.valueKey, 0))
         this.videoViewsFilter.setParam(GM_getValue(GM_KEYS.black.views.valueKey, 0))
         this.videoTitleFilter.setParam(GM_getValue(GM_KEYS.black.title.valueKey, []))
         this.videoPubdateFilter.setParam(GM_getValue(GM_KEYS.black.pubdate.valueKey, 0))
         this.videoUploaderFilter.setParam(GM_getValue(GM_KEYS.black.uploader.valueKey, []))
         this.videoUploaderKeywordFilter.setParam(GM_getValue(GM_KEYS.black.uploaderKeyword.valueKey, []))
+        this.videoPartitionFilter.setParam(GM_getValue(GM_KEYS.black.partition.valueKey, []))
         // 白名单
         this.videoUploaderWhiteFilter.setParam(GM_getValue(GM_KEYS.white.uploader.valueKey, []))
-        this.videoTitleWhiteFilter.setParam(GM_getValue(GM_KEYS.white.title.valueKey, []))
     }
 
     async check(mode?: 'full' | 'incr') {
@@ -140,7 +147,6 @@ class VideoFilterHomepage implements IMainFilter {
         }
         let revertAll = false
         if (!(
-            this.videoBvidFilter.isEnable ||
             this.videoDurationFilter.isEnable ||
             this.videoViewsFilter.isEnable ||
             this.videoTitleFilter.isEnable ||
@@ -161,6 +167,32 @@ class VideoFilterHomepage implements IMainFilter {
         if (!videos.length) {
             return
         }
+
+        // 分区：首页推荐数据不含分区，需按bvid抓取view接口
+        const partitionFilterOn = this.videoPartitionFilter.isEnable
+        const tagOn = this.showPartitionTag
+        if (partitionFilterOn || tagOn) {
+            const bvids = videos.map((v) => selectorFns.bvid(v)).filter((b): b is string => typeof b === 'string')
+            if (bvids.length) {
+                const ensurePromise = ensurePartition(bvids)
+                if (partitionFilterOn) {
+                    // 过滤需要分区数据就绪后再检测
+                    await ensurePromise
+                } else {
+                    // 仅标签：后台抓取，就绪后直接更新本批视频标签
+                    // （不能重跑checkFull——ensurePartition恒返回已决议的promise，会自我触发形成死循环卡死页面）
+                    ensurePromise
+                        .then(() => {
+                            videos.forEach((v) => setPartitionTag(v, selectorFns.partition(v), 'after-date'))
+                        })
+                        .catch(() => {})
+                }
+            }
+        }
+        // 分区标签（首页：跟在昵称行上传时间后面，形成 昵称 上传时间 分区 左右排列）
+        if (tagOn) {
+            videos.forEach((v) => setPartitionTag(v, selectorFns.partition(v), 'after-date'))
+        }
         if (revertAll) {
             videos.forEach((v) => showEle(v, 'sign'))
             return
@@ -177,6 +209,7 @@ class VideoFilterHomepage implements IMainFilter {
                         `title: ${selectorFns.title(v)}`,
                         `uploader: ${selectorFns.uploader(v)}`,
                         `pubdate: ${selectorFns.pubdate(v)}`,
+                        `partition: ${selectorFns.partition(v)}`,
                         `isFollow: ${selectorFns.isFollow(v)}`,
                     ].join('\n'),
                 )
@@ -192,17 +225,14 @@ class VideoFilterHomepage implements IMainFilter {
         this.videoUploaderFilter.isEnable && blackPairs.push([this.videoUploaderFilter, selectorFns.uploader])
         this.videoUploaderKeywordFilter.isEnable &&
             blackPairs.push([this.videoUploaderKeywordFilter, selectorFns.uploader])
+        this.videoPartitionFilter.isEnable && blackPairs.push([this.videoPartitionFilter, selectorFns.partition])
 
         const whitePairs: SubFilterPair[] = []
         this.videoUploaderWhiteFilter.isEnable && whitePairs.push([this.videoUploaderWhiteFilter, selectorFns.uploader])
-        this.videoTitleWhiteFilter.isEnable && whitePairs.push([this.videoTitleWhiteFilter, selectorFns.title])
         this.videoIsFollowWhiteFilter.isEnable && whitePairs.push([this.videoIsFollowWhiteFilter, selectorFns.isFollow])
 
-        const forceBlackPairs: SubFilterPair[] = []
-        this.videoBvidFilter.isEnable && forceBlackPairs.push([this.videoBvidFilter, selectorFns.bvid])
-
         // 检测
-        const blackCnt = await coreCheck(videos, true, 'sign', blackPairs, whitePairs, forceBlackPairs)
+        const blackCnt = await coreCheck(videos, true, 'sign', blackPairs, whitePairs)
         const time = (performance.now() - timer).toFixed(1)
         logger.debug(`VideoFilterHomepage hide ${blackCnt} in ${videos.length} videos, mode=${mode}, time=${time}`)
     }
@@ -250,8 +280,7 @@ export const videoFilterHomepageEntry = async () => {
     const checkHomepageSuffix = () => {
         if (
             location.pathname.startsWith('/index.html') &&
-            (mainFilter.videoBvidFilter.isEnable ||
-                mainFilter.videoDurationFilter.isEnable ||
+            (mainFilter.videoDurationFilter.isEnable ||
                 mainFilter.videoViewsFilter.isEnable ||
                 mainFilter.videoTitleFilter.isEnable ||
                 mainFilter.videoUploaderFilter.isEnable ||
@@ -406,37 +435,6 @@ export const videoFilterHomepageGroups: Group[] = [
         ],
     },
     {
-        name: 'BV号过滤',
-        items: [
-            {
-                type: 'switch',
-                id: GM_KEYS.black.bvid.statusKey,
-                name: '启用 BV号过滤 (右键单击标题)',
-                noStyle: true,
-                enableFn: () => {
-                    mainFilter.videoBvidFilter.enable()
-                    mainFilter.checkFull()
-                },
-                disableFn: () => {
-                    mainFilter.videoBvidFilter.disable()
-                    mainFilter.checkFull()
-                },
-            },
-            {
-                type: 'editor',
-                id: GM_KEYS.black.bvid.valueKey,
-                name: '编辑 BV号黑名单',
-                description: ['右键屏蔽的BV号会出现在首行'],
-                editorTitle: 'BV号 黑名单',
-                editorDescription: ['每行一个BV号，保存时自动去重'],
-                saveFn: async () => {
-                    mainFilter.videoBvidFilter.setParam(GM_getValue(GM_KEYS.black.bvid.valueKey, []))
-                    mainFilter.checkFull()
-                },
-            },
-        ],
-    },
-    {
         name: '发布日期过滤',
         fold: true,
         items: [
@@ -510,6 +508,61 @@ export const videoFilterHomepageGroups: Group[] = [
         ],
     },
     {
+        name: '分区过滤',
+        items: [
+            {
+                type: 'switch',
+                id: GM_KEYS.black.partition.statusKey,
+                name: '启用 分区过滤',
+                noStyle: true,
+                enableFn: () => {
+                    mainFilter.videoPartitionFilter.enable()
+                    mainFilter.checkFull()
+                },
+                disableFn: () => {
+                    mainFilter.videoPartitionFilter.disable()
+                    mainFilter.checkFull()
+                },
+            },
+            {
+                type: 'editor',
+                id: GM_KEYS.black.partition.valueKey,
+                name: '编辑 分区黑名单',
+                description: [
+                    '黑名单内容全站共用，开关仅对本页生效',
+                    '首页推荐数据不含分区，需按视频请求接口，首次加载稍慢',
+                ],
+                editorTitle: '分区 黑名单',
+                editorDescription: [
+                    '启用后，右键视频卡片可快捷屏蔽分区',
+                    '每行一个分区ID，精确屏蔽该分区',
+                    '分区ID 参考：17 单机游戏 | 21 日常 | 24 MAD·AMV | 124 社科·法律·心理',
+                    '138 搞笑 | 172 手机游戏 | 182 影视杂谈 | 201 科学科普',
+                ],
+                saveFn: async () => {
+                    mainFilter.videoPartitionFilter.setParam(GM_getValue(GM_KEYS.black.partition.valueKey, []))
+                    mainFilter.checkFull()
+                },
+            },
+            {
+                type: 'switch',
+                id: GM_KEYS.black.partitionTag.statusKey,
+                name: '显示 分区标签',
+                description: ['在昵称行（上传时间后）显示分区名称与ID，形成 昵称 上传时间 分区 左右排列'],
+                defaultEnable: true,
+                noStyle: true,
+                enableFn: () => {
+                    mainFilter.showPartitionTag = true
+                    mainFilter.checkFull()
+                },
+                disableFn: () => {
+                    mainFilter.showPartitionTag = false
+                    mainFilter.checkFull()
+                },
+            },
+        ],
+    },
+    {
         name: '白名单 免过滤',
         items: [
             {
@@ -553,35 +606,6 @@ export const videoFilterHomepageGroups: Group[] = [
                     mainFilter.checkFull()
                 },
             },
-            {
-                type: 'switch',
-                id: GM_KEYS.white.title.statusKey,
-                name: '启用 标题关键词白名单',
-                noStyle: true,
-                enableFn: () => {
-                    mainFilter.videoTitleWhiteFilter.enable()
-                    mainFilter.checkFull()
-                },
-                disableFn: () => {
-                    mainFilter.videoTitleWhiteFilter.disable()
-                    mainFilter.checkFull()
-                },
-            },
-            {
-                type: 'editor',
-                id: GM_KEYS.white.title.valueKey,
-                name: '编辑 标题关键词白名单',
-                editorTitle: '标题关键词 白名单',
-                editorDescription: [
-                    '每行一个关键词或正则，不区分大小写、全半角',
-                    '请勿使用过于激进的关键词或正则',
-                    '正则默认 ius 模式，无需 flag，语法：/abc|\\d+/',
-                ],
-                saveFn: async () => {
-                    mainFilter.videoTitleWhiteFilter.setParam(GM_getValue(GM_KEYS.white.title.valueKey, []))
-                    mainFilter.checkFull()
-                },
-            },
         ],
     },
 ]
@@ -593,8 +617,26 @@ export const videoFilterHomepageHandler: ContextMenuTargetHandler = (target: HTM
     }
 
     const menus: FilterContextMenu[] = []
-    // UP主
-    if (target.closest('.bili-video-card__info--owner')) {
+    // 分区（仅在分区标签上右键触发，避免范围过大）
+    if (target.closest('.bili-cleaner-partition-tag')) {
+        const partitionCard = target.closest<HTMLElement>('.bili-video-card, .feed-card, .bili-feed-card')
+        if (partitionCard) {
+            const partition = parsePartitionValue(selectorFns.partition(partitionCard))
+            if (partition) {
+                menus.push(
+                    ...buildPartitionContextMenus({
+                        partition,
+                        isEnable: mainFilter.videoPartitionFilter.isEnable,
+                        valueKey: GM_KEYS.black.partition.valueKey,
+                        addParam: (value) => mainFilter.videoPartitionFilter.addParam(value),
+                        checkFull: () => mainFilter.checkFull(),
+                    }),
+                )
+            }
+        }
+    }
+    // UP主（排除分区标签区域，标签右键只弹分区菜单）
+    if (target.closest('.bili-video-card__info--owner') && !target.closest('.bili-cleaner-partition-tag')) {
         const uploader = target
             .closest('.bili-video-card__info--owner')
             ?.querySelector('.bili-video-card__info--author')
@@ -705,30 +747,6 @@ export const videoFilterHomepageHandler: ContextMenuTargetHandler = (target: HTM
                     }
                 },
             })
-        }
-        const url = titleEl?.querySelector('a')?.href
-        if (url && mainFilter.videoBvidFilter.isEnable) {
-            const bvid = matchBvid(url)
-            if (bvid) {
-                menus.push({
-                    name: `屏蔽视频 ${bvid}`,
-                    fn: async () => {
-                        try {
-                            mainFilter.videoBvidFilter.addParam(bvid)
-                            mainFilter.checkFull()
-                            const arr: string[] = GM_getValue(GM_KEYS.black.bvid.valueKey, [])
-                            arr.unshift(bvid)
-                            GM_setValue(GM_KEYS.black.bvid.valueKey, orderedUniq(arr))
-                        } catch (err) {
-                            logger.error(`videoFilterHomepageHandler add bvid ${bvid} failed`, err)
-                        }
-                    },
-                })
-                menus.push({
-                    name: '复制视频链接',
-                    fn: () => navigator.clipboard.writeText(`https://www.bilibili.com/video/${bvid}`).catch(() => {}),
-                })
-            }
         }
     }
     return menus

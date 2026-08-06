@@ -4,6 +4,8 @@ export declare global {
         __INITIAL_STATE__?: {
             related?: {
                 bvid?: string
+                tid?: number
+                tname?: string
             }[]
         }
         __NEXT_DATA__?: any
