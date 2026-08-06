@@ -44,42 +44,39 @@ const currentItem = ref<IEditorItem | null>(null)
 
 let stopWatch: WatchStopHandle | null = null
 
+/** 将编辑行文本保存为存储值（经 linesToValue 转换后去重） */
+const saveEditor = () => {
+    if (!currentItem.value) {
+        return
+    }
+    try {
+        let data = editorData.value.split('\n').filter((v) => v.trim() !== '')
+        if (currentItem.value.linesToValue) {
+            data = currentItem.value.linesToValue(data)
+        }
+        data = orderedUniq(data)
+        GM_setValue(currentItem.value.id, data)
+        currentItem.value.saveFn()
+    } catch (err) {
+        logger.error(`EditorDialog ${currentItem.value.id} saveData error`, err)
+    }
+}
+
 const openEditor = (item: IEditorItem) => {
     currentItem.value = item
 
-    const val = GM_getValue(item.id, []).join('\n')
-    editorData.value = val ? val + '\n' : val
+    const val = GM_getValue(item.id, []) as string[]
+    const lines = item.valueToLines ? item.valueToLines(val) : val
+    const text = lines.join('\n')
+    editorData.value = text ? text + '\n' : ''
 
-    stopWatch = watchDebounced(
-        editorData,
-        (value) => {
-            if (!currentItem.value) {
-                return
-            }
-            try {
-                const data = orderedUniq(value.split('\n').filter((v) => v.trim() !== ''))
-                GM_setValue(currentItem.value.id, data)
-                currentItem.value.saveFn()
-            } catch (err) {
-                logger.error(`EditorDialog ${currentItem.value.id} saveData error`, err)
-            }
-        },
-        { debounce: 1000 },
-    )
+    stopWatch = watchDebounced(editorData, saveEditor, { debounce: 1000 })
 
     isEditorShow.value = true
 }
 
 const closeEditor = () => {
-    if (currentItem.value) {
-        try {
-            const data = orderedUniq(editorData.value.split('\n').filter((v) => v.trim() !== ''))
-            GM_setValue(currentItem.value.id, data)
-            currentItem.value.saveFn()
-        } catch (err) {
-            logger.error(`EditorDialog ${currentItem.value.id} closeEditor error`, err)
-        }
-    }
+    saveEditor()
     isEditorShow.value = false
 }
 
