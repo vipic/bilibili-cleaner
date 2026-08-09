@@ -19,13 +19,10 @@ import { VideoUploaderWhiteFilter } from '../subFilters/white'
 import {
     buildPartitionContextMenus,
     parsePartitionValue,
-    partitionNameMap,
     partitionLinesToValue,
     partitionValueToLines,
-    partitionTagClass,
     setPartitionTag,
 } from '../partition'
-import { ensurePartition, getPartition } from '../homepagePartition'
 
 const GM_KEYS = {
     black: {
@@ -79,23 +76,6 @@ const getRelatedPartitionMap = (): Map<string, string> => {
     return map
 }
 
-const currentVideoPartitionTagClass = 'bili-cleaner-current-video-partition-tag'
-
-/** 读取当前播放视频的分区；页面状态缺失或切换视频未更新时由接口缓存补全。 */
-const getCurrentVideoPartition = (): SelectorResult => {
-    const bvid = matchBvid(location.href)
-    if (!bvid) {
-        return undefined
-    }
-    const videoData = unsafeWindow.__INITIAL_STATE__?.videoData
-    if (videoData && (!videoData.bvid || videoData.bvid === bvid) && (videoData.tid || videoData.tname)) {
-        const tid = videoData.tid ? String(videoData.tid) : ''
-        const tname = videoData.tname?.trim() || (tid && partitionNameMap[tid]) || ''
-        return `${tid}|${tname}`
-    }
-    return getPartition(bvid)
-}
-
 // 视频列表信息提取
 const selectorFns = {
     duration: (video: HTMLElement): SelectorResult => {
@@ -125,7 +105,6 @@ let enableRelatedCheck = false
 
 class VideoFilterVideo implements IMainFilter {
     target: HTMLElement | undefined
-    currentVideoInfoTarget: HTMLElement | undefined
 
     // 黑名单
     videoDurationFilter = new VideoDurationFilter()
@@ -151,7 +130,6 @@ class VideoFilterVideo implements IMainFilter {
     }
 
     async check(mode?: 'full' | 'incr') {
-        await this.updateCurrentVideoPartitionTag()
         if (!this.target) {
             return
         }
@@ -242,64 +220,6 @@ class VideoFilterVideo implements IMainFilter {
         })
     }
 
-    async updateCurrentVideoPartitionTag() {
-        const target = this.currentVideoInfoTarget
-        if (!target) {
-            return
-        }
-        const existing = target.querySelector<HTMLElement>(`.${currentVideoPartitionTagClass}`)
-        if (!this.showPartitionTag) {
-            existing?.remove()
-            return
-        }
-
-        const bvid = matchBvid(location.href)
-        if (!bvid) {
-            existing?.remove()
-            return
-        }
-        let value = getCurrentVideoPartition()
-        if (typeof value !== 'string') {
-            await ensurePartition([bvid])
-            // SPA 切换期间旧请求返回时，不把旧视频分区写入新页面。
-            if (matchBvid(location.href) !== bvid) {
-                return
-            }
-            value = getCurrentVideoPartition()
-        }
-        const partition = parsePartitionValue(value)
-        if (!partition) {
-            existing?.remove()
-            return
-        }
-        const tname = partition.tname || (partition.tid && partitionNameMap[partition.tid]) || ''
-        const text = partition.tid ? `${partition.tid} ${tname}`.trim() : tname
-        if (!text) {
-            existing?.remove()
-            return
-        }
-        if (existing) {
-            if (existing.textContent !== text) {
-                existing.textContent = text
-            }
-            const title = partition.tid ? `分区ID ${partition.tid}${tname ? ` · ${tname}` : ''}` : tname
-            if (existing.title !== title) {
-                existing.title = title
-            }
-            const partitionValue = typeof value === 'string' ? value : ''
-            if (existing.dataset.partition !== partitionValue) {
-                existing.dataset.partition = partitionValue
-            }
-            return
-        }
-        const tag = document.createElement('span')
-        tag.className = `${partitionTagClass} ${currentVideoPartitionTagClass}`
-        tag.textContent = text
-        tag.title = partition.tid ? `分区ID ${partition.tid}${tname ? ` · ${tname}` : ''}` : tname
-        tag.dataset.partition = typeof value === 'string' ? value : ''
-        target.appendChild(tag)
-    }
-
     // checkIncr() {
     //     this.check('incr')
     //         .catch((err) => {
@@ -307,42 +227,7 @@ class VideoFilterVideo implements IMainFilter {
     //         })
     // }
 
-    observeCurrentVideoInfo() {
-        const currentVideoInfoSelector = '.video-info-detail-list, .video-info-meta'
-        waitForEle(
-            document,
-            currentVideoInfoSelector,
-            (node) => node.matches(currentVideoInfoSelector) || node.querySelector(currentVideoInfoSelector) !== null,
-        ).then((ele) => {
-            if (!ele) {
-                return
-            }
-            this.currentVideoInfoTarget = ele
-            this.checkFull()
-
-            const infoContainer = ele.closest<HTMLElement>('.video-info-container') ?? ele
-            new MutationObserver(() => {
-                this.currentVideoInfoTarget =
-                    (infoContainer.matches(currentVideoInfoSelector)
-                        ? infoContainer
-                        : infoContainer.querySelector<HTMLElement>(currentVideoInfoSelector)) ?? undefined
-                this.checkFull()
-            }).observe(infoContainer, { childList: true, subtree: true })
-        })
-    }
-
     observe() {
-        // 播放页会在首次加载时 hydration 整个 #app。过早插入分区标签会干扰顶栏组件接管，
-        // 表现为服务端 header 短暂出现后子节点被清空，因此等 load 后再修改详情信息区 DOM。
-        const observeCurrentVideoInfo = () => {
-            setTimeout(() => this.observeCurrentVideoInfo(), 500)
-        }
-        if (document.readyState === 'complete') {
-            observeCurrentVideoInfo()
-        } else {
-            window.addEventListener('load', observeCurrentVideoInfo, { once: true })
-        }
-
         waitForEle(
             document,
             '#reco_list, .recommend-list-v1, .recommend-list-container',
@@ -535,7 +420,7 @@ export const videoFilterVideoGroups: Group[] = [
                 name: '编辑 分区黑名单',
                 description: [
                     '黑名单内容全站共用，开关仅对本页生效',
-                    '作用于右侧 相关视频 / 接下来播放；当前视频标签可用于快捷录入',
+                    '作用于右侧 相关视频 / 接下来播放；分区标签可用于快捷录入',
                 ],
                 editorTitle: '分区 黑名单',
                 editorDescription: [
@@ -554,7 +439,7 @@ export const videoFilterVideoGroups: Group[] = [
                 type: 'switch',
                 id: GM_KEYS.black.partitionTag.statusKey,
                 name: '显示 分区标签',
-                description: ['在当前视频信息区及相关视频UP主昵称上方显示分区名称与ID'],
+                description: ['在相关视频UP主昵称上方显示分区名称与ID'],
                 defaultEnable: true,
                 noStyle: true,
                 enableFn: () => {
@@ -635,14 +520,10 @@ export const videoFilterVideoHandler: ContextMenuTargetHandler = (target: HTMLEl
     // 分区（仅在分区标签上右键触发，避免范围过大）
     const partitionTag = target.closest<HTMLElement>('.bili-cleaner-partition-tag')
     if (partitionTag) {
-        const currentPartition = partitionTag.classList.contains(currentVideoPartitionTagClass)
-            ? parsePartitionValue(partitionTag.dataset.partition)
-            : null
         const partitionCard = target.closest<HTMLElement>(
             '.recommend-video-card, .video-page-card-small, .video-page-operator-card-small',
         )
-        const partition =
-            currentPartition || (partitionCard && parsePartitionValue(selectorFns.partition(partitionCard)))
+        const partition = partitionCard && parsePartitionValue(selectorFns.partition(partitionCard))
         if (partition) {
             menus.push(
                 ...buildPartitionContextMenus({
