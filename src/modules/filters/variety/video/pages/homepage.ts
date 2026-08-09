@@ -158,7 +158,8 @@ class VideoFilterHomepage implements IMainFilter {
             this.videoTitleFilter.isEnable ||
             this.videoUploaderFilter.isEnable ||
             this.videoUploaderKeywordFilter.isEnable ||
-            this.videoPubdateFilter.isEnable
+            this.videoPubdateFilter.isEnable ||
+            this.videoPartitionFilter.isEnable
         )) {
             revertAll = true
         }

@@ -54,6 +54,7 @@ export const partitionNameMap: Record<string, string> = {
     241: '娱乐杂谈',
     242: '娱乐粉丝创作',
     243: '乐评盘点',
+    248: '房车',
     250: '出行',
     251: '三农',
     252: '仿妆cos',
@@ -160,7 +161,7 @@ export const parsePartitionValue = (value: SelectorResult): { tid?: string; tnam
     const sepIdx = value.indexOf('|')
     const tid = sepIdx >= 0 ? value.slice(0, sepIdx).trim() : ''
     const tname = sepIdx >= 0 ? value.slice(sepIdx + 1).trim() : value.trim()
-    if (!tname) {
+    if (!tid && !tname) {
         return null
     }
     return tid ? { tid, tname } : { tname }
@@ -204,7 +205,7 @@ export const setPartitionTag = (
     const el = document.createElement('span')
     el.className = partitionTagClass
     el.textContent = text
-    el.title = partition.tid ? `分区ID ${partition.tid} · ${tname}` : tname
+    el.title = partition.tid ? `分区ID ${partition.tid}${tname ? ` · ${tname}` : ''}` : tname
     if (placement === 'after-date') {
         // 首页：跟在昵称行的上传时间后面，形成 昵称 上传时间 分区 左右排列
         const date = card.querySelector<HTMLElement>('span.bili-video-card__info--date')
@@ -241,8 +242,9 @@ export const buildPartitionContextMenus = (opts: {
         return menus
     }
     const tid = opts.partition.tid
+    const partitionName = opts.partition.tname || partitionNameMap[tid] || tid
     menus.push({
-        name: `屏蔽分区：${opts.partition.tname}`,
+        name: `屏蔽分区：${partitionName}`,
         fn: async () => {
             try {
                 // 存储 "ID 名称"，便于在黑名单编辑器中识别分区

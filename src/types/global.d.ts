@@ -2,6 +2,11 @@ export declare global {
     interface Window {
         isWide?: boolean
         __INITIAL_STATE__?: {
+            videoData?: {
+                bvid?: string
+                tid?: number
+                tname?: string
+            }
             related?: {
                 bvid?: string
                 tid?: number
