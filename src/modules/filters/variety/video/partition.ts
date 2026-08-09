@@ -54,12 +54,93 @@ export const partitionNameMap: Record<string, string> = {
     241: '娱乐杂谈',
     242: '娱乐粉丝创作',
     243: '乐评盘点',
+    248: '房车',
     250: '出行',
     251: '三农',
     252: '仿妆cos',
     253: '动漫杂谈',
     256: '短片',
     260: '影视整活',
+    // 顶级大区
+    1: '动画',
+    3: '音乐',
+    4: '游戏',
+    5: '娱乐',
+    11: '电视剧',
+    13: '番剧',
+    23: '电影',
+    36: '知识',
+    119: '鬼畜',
+    129: '舞蹈',
+    155: '时尚',
+    160: '生活',
+    167: '国创',
+    177: '纪录片',
+    181: '影视',
+    188: '科技',
+    211: '美食',
+    217: '动物圈',
+    223: '汽车',
+    234: '运动',
+    // 其他子分区
+    19: 'Mugen',
+    20: '宅舞',
+    25: 'MMD·3D',
+    26: '音MAD',
+    28: '原创音乐',
+    29: '音乐现场',
+    32: '完结动画',
+    33: '连载动画',
+    37: '人文·历史',
+    51: '资讯',
+    71: '综艺',
+    75: '动物综合',
+    83: '其他国家',
+    122: '野生技能协会',
+    126: '人力VOCALOID',
+    127: '教程演示',
+    145: '欧美电影',
+    146: '日本电影',
+    147: '国产电影',
+    152: '官方延伸',
+    153: '国产动画',
+    154: '舞蹈综合',
+    156: '舞蹈教程',
+    157: '美妆护肤',
+    158: '穿搭',
+    159: '时尚潮流',
+    168: '国产原创相关',
+    169: '布袋戏',
+    170: '资讯',
+    178: '科学·探索·自然',
+    179: '军事',
+    180: '社会·美食·旅行',
+    184: '预告·资讯',
+    185: '国产剧',
+    187: '海外剧',
+    194: '电音',
+    195: '动态漫·广播剧',
+    198: '街舞',
+    199: '明星舞蹈',
+    200: '中国舞',
+    209: '职业职场',
+    210: '手办·模玩',
+    213: '美食测评',
+    214: '田园美食',
+    221: '野生动物',
+    222: '爬宠',
+    224: '汽车文化',
+    225: '汽车极客',
+    226: '智能出行',
+    227: '购车攻略',
+    229: '设计·创意',
+    230: '软件应用',
+    231: '计算机技术',
+    233: '极客DIY',
+    235: '篮球·足球',
+    236: '竞技体育',
+    237: '运动文化',
+    239: '家居房产',
 }
 
 // UP主昵称元素选择器，分区标签插在其上方
@@ -80,7 +161,7 @@ export const parsePartitionValue = (value: SelectorResult): { tid?: string; tnam
     const sepIdx = value.indexOf('|')
     const tid = sepIdx >= 0 ? value.slice(0, sepIdx).trim() : ''
     const tname = sepIdx >= 0 ? value.slice(sepIdx + 1).trim() : value.trim()
-    if (!tname) {
+    if (!tid && !tname) {
         return null
     }
     return tid ? { tid, tname } : { tname }
@@ -124,7 +205,7 @@ export const setPartitionTag = (
     const el = document.createElement('span')
     el.className = partitionTagClass
     el.textContent = text
-    el.title = partition.tid ? `分区ID ${partition.tid} · ${tname}` : tname
+    el.title = partition.tid ? `分区ID ${partition.tid}${tname ? ` · ${tname}` : ''}` : tname
     if (placement === 'after-date') {
         // 首页：跟在昵称行的上传时间后面，形成 昵称 上传时间 分区 左右排列
         const date = card.querySelector<HTMLElement>('span.bili-video-card__info--date')
@@ -161,14 +242,18 @@ export const buildPartitionContextMenus = (opts: {
         return menus
     }
     const tid = opts.partition.tid
+    const partitionName = opts.partition.tname || partitionNameMap[tid] || tid
     menus.push({
-        name: `屏蔽分区：${opts.partition.tname}`,
+        name: `屏蔽分区：${partitionName}`,
         fn: async () => {
             try {
-                opts.addParam(tid)
+                // 存储 "ID 名称"，便于在黑名单编辑器中识别分区
+                const name = opts.partition.tname || partitionNameMap[tid] || ''
+                const value = name ? `${tid} ${name}` : tid
+                opts.addParam(value)
                 opts.checkFull()
                 const arr: string[] = GM_getValue(opts.valueKey, [])
-                arr.unshift(tid)
+                arr.unshift(value)
                 GM_setValue(opts.valueKey, orderedUniq(arr))
             } catch (err) {
                 logger.error(`block partition ${opts.partition.tname} failed`, err)
@@ -177,3 +262,25 @@ export const buildPartitionContextMenus = (opts: {
     })
     return menus
 }
+
+/** 提取行首分区ID，容忍 "124"、"124|名称"、"124 名称" 格式，非数字开头时原样返回 */
+export const partitionLineToId = (line: string): string => line.trim().match(/^\d+/)?.[0] ?? line.trim()
+
+/** 分区黑名单编辑器：存储值 -> 显示行，补全分区名称便于识别 */
+export const partitionValueToLines = (value: string[]): string[] => {
+    return value.map((line) => {
+        const id = line.trim().match(/^\d+/)?.[0]
+        if (!id) {
+            return line
+        }
+        const rest = line.trim().slice(id.length).trim().replace(/^\|/, '')
+        if (rest) {
+            return `${id} ${rest}`
+        }
+        const name = partitionNameMap[id]
+        return name ? `${id} ${name}` : id
+    })
+}
+
+/** 分区黑名单编辑器：显示行 -> 存储值，仅保留分区ID */
+export const partitionLinesToValue = (lines: string[]): string[] => lines.map(partitionLineToId)

@@ -156,6 +156,13 @@ export const loadFilterStyle = () => {
     width: auto;
     margin: 0 6px 0 8px;
 }
+/* 播放页：当前视频分区跟随播放/弹幕/发布日期信息同行显示 */
+.bili-cleaner-current-video-partition-tag {
+    display: inline-block;
+    flex: none;
+    margin: 0 0 0 12px;
+    vertical-align: middle;
+}
 /* 分区标签存在时，热门页/播放页 昵称与播放量上下排列 */
 .bili-cleaner-partition-tag ~ .up-name,
 .bili-cleaner-partition-tag ~ .video-stat,

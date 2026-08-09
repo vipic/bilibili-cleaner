@@ -176,4 +176,10 @@ export interface IEditorItem extends IBaseItem {
 
     // 保存时运行函数
     saveFn: () => Promise<void> | void
+
+    // 打开编辑器时，将存储值转换为编辑行文本（如 分区黑名单 显示 "124 社科·法律·心理"）
+    valueToLines?: (value: string[]) => string[]
+
+    // 保存时，将编辑行文本转换为存储值（如 分区黑名单 仅保留分区ID）
+    linesToValue?: (lines: string[]) => string[]
 }

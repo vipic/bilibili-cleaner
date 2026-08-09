@@ -17,7 +17,13 @@ import {
     VideoUploaderKeywordFilter,
 } from '../subFilters/black'
 import { VideoUploaderWhiteFilter } from '../subFilters/white'
-import { buildPartitionContextMenus, parsePartitionValue, setPartitionTag } from '../partition'
+import {
+    buildPartitionContextMenus,
+    parsePartitionValue,
+    partitionLinesToValue,
+    partitionValueToLines,
+    setPartitionTag,
+} from '../partition'
 
 const GM_KEYS = {
     black: {
@@ -450,10 +456,11 @@ export const videoFilterPopularGroups: Group[] = [
                 editorTitle: '分区 黑名单',
                 editorDescription: [
                     '启用后，右键视频卡片可快捷屏蔽分区',
-                    '每行一个分区ID，精确屏蔽该分区',
-                    '分区ID 参考：17 单机游戏 | 21 日常 | 24 MAD·AMV | 124 社科·法律·心理',
-                    '138 搞笑 | 172 手机游戏 | 182 影视杂谈 | 201 科学科普',
+                    '每行一个分区（ID 名称），如：124 社科·法律·心理',
+                    '右键屏蔽会自动附带分区名称，便于识别',
                 ],
+                valueToLines: partitionValueToLines,
+                linesToValue: partitionLinesToValue,
                 saveFn: async () => {
                     mainFilter.videoPartitionFilter.setParam(GM_getValue(GM_KEYS.black.partition.valueKey, []))
                     mainFilter.checkFull()
