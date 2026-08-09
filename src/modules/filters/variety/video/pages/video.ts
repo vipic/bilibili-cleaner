@@ -307,7 +307,7 @@ class VideoFilterVideo implements IMainFilter {
     //         })
     // }
 
-    observe() {
+    observeCurrentVideoInfo() {
         const currentVideoInfoSelector = '.video-info-detail-list, .video-info-meta'
         waitForEle(
             document,
@@ -329,6 +329,19 @@ class VideoFilterVideo implements IMainFilter {
                 this.checkFull()
             }).observe(infoContainer, { childList: true, subtree: true })
         })
+    }
+
+    observe() {
+        // 播放页会在首次加载时 hydration 整个 #app。过早插入分区标签会干扰顶栏组件接管，
+        // 表现为服务端 header 短暂出现后子节点被清空，因此等 load 后再修改详情信息区 DOM。
+        const observeCurrentVideoInfo = () => {
+            setTimeout(() => this.observeCurrentVideoInfo(), 500)
+        }
+        if (document.readyState === 'complete') {
+            observeCurrentVideoInfo()
+        } else {
+            window.addEventListener('load', observeCurrentVideoInfo, { once: true })
+        }
 
         waitForEle(
             document,
