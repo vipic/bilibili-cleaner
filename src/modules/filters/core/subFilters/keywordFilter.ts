@@ -2,6 +2,11 @@ import { ISubFilter, SelectorFn } from '@/types/filter'
 import { logger } from '@/utils/logger'
 import { toHalfWidth } from '@/utils/tool'
 
+/** 移除目标文本中的 Unicode 空白及常见零宽空白，防止插入空白绕过关键词过滤 */
+const removeTargetWhitespace = (value: string): string => {
+    return value.replace(/[\p{White_Space}\u180E\u200B-\u200D\u2060\uFEFF]+/gu, '')
+}
+
 export class KeywordFilter implements ISubFilter {
     isEnable = false
     private keywordSet = new Set<string>()
@@ -72,8 +77,9 @@ export class KeywordFilter implements ISubFilter {
                 let value = selectorFn(el)
                 if (typeof value === 'string') {
                     value = toHalfWidth(value).trim()
+                    const compactValue = removeTargetWhitespace(value)
                     for (const regex of this.mergedRegExp) {
-                        if (regex.test(value)) {
+                        if (regex.test(value) || (compactValue !== value && regex.test(compactValue))) {
                             reject()
                             return
                         }
