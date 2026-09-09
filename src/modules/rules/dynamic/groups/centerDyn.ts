@@ -1,5 +1,7 @@
 import { Item } from '@/types/item'
 
+let unfoldTimer: ReturnType<typeof setInterval> | null = null
+
 export const dynamicCenterDynItems: Item[] = [
     {
         type: 'switch',
@@ -82,7 +84,10 @@ export const dynamicCenterDynItems: Item[] = [
         id: 'dynamic-page-unfold-dynamic',
         name: '自动展开 相同UP主被折叠的动态',
         noStyle: true,
-        enableFn: async () => {
+        enableFn: () => {
+            if (unfoldTimer !== null) {
+                return
+            }
             // 大量动态下，单次耗时10ms内
             const unfold = () => {
                 const dynFoldNodes = document.querySelectorAll('main .bili-dyn-list__item .bili-dyn-item-fold')
@@ -92,7 +97,14 @@ export const dynamicCenterDynItems: Item[] = [
                     })
                 }
             }
-            setInterval(unfold, 500)
+            unfold()
+            unfoldTimer = setInterval(unfold, 500)
+        },
+        disableFn: () => {
+            if (unfoldTimer !== null) {
+                clearInterval(unfoldTimer)
+                unfoldTimer = null
+            }
         },
     },
     {
