@@ -27,35 +27,35 @@ import {
 const GM_KEYS = {
     black: {
         duration: {
-            statusKey: 'video-duration-filter-status',
+            statusKey: 'global-duration-filter-status',
             valueKey: 'global-duration-filter-value',
         },
         uploader: {
-            statusKey: 'video-uploader-filter-status',
+            statusKey: 'global-uploader-filter-status',
             valueKey: 'global-uploader-filter-value',
         },
         uploaderKeyword: {
-            statusKey: 'video-uploader-keyword-filter-status',
+            statusKey: 'global-uploader-keyword-filter-status',
             valueKey: 'global-uploader-keyword-filter-value',
         },
         title: {
-            statusKey: 'video-title-keyword-filter-status',
+            statusKey: 'global-title-keyword-filter-status',
             valueKey: 'global-title-keyword-filter-value',
         },
         related: {
             statusKey: 'video-related-filter-status',
         },
         partition: {
-            statusKey: 'video-partition-filter-status',
+            statusKey: 'global-partition-filter-status',
             valueKey: 'global-partition-filter-value',
         },
         partitionTag: {
-            statusKey: 'video-partition-tag-status',
+            statusKey: 'global-partition-tag-status',
         },
     },
     white: {
         uploader: {
-            statusKey: 'video-uploader-whitelist-filter-status',
+            statusKey: 'global-uploader-whitelist-filter-status',
             valueKey: 'global-uploader-whitelist-filter-value',
         },
     },
@@ -418,10 +418,7 @@ export const videoFilterVideoGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.partition.valueKey,
                 name: '编辑 分区黑名单',
-                description: [
-                    '黑名单内容全站共用，开关仅对本页生效',
-                    '作用于右侧 相关视频 / 接下来播放；分区标签可用于快捷录入',
-                ],
+                description: ['开关和黑名单内容全站共用', '作用于右侧 相关视频 / 接下来播放；分区标签可用于快捷录入'],
                 editorTitle: '分区 黑名单',
                 editorDescription: [
                     '启用后，右键视频卡片可快捷屏蔽分区',

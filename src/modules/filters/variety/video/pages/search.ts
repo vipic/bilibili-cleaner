@@ -14,6 +14,7 @@ import {
     VideoTitleFilter,
     VideoUploaderFilter,
     VideoUploaderKeywordFilter,
+    VideoViewsFilter,
 } from '../subFilters/black'
 import { VideoUploaderWhiteFilter } from '../subFilters/white'
 import {
@@ -23,36 +24,41 @@ import {
     partitionValueToLines,
     setPartitionTag,
 } from '../partition'
+import { parseVideoViews } from '../views'
 
 const GM_KEYS = {
     black: {
         duration: {
-            statusKey: 'search-duration-filter-status',
+            statusKey: 'global-duration-filter-status',
             valueKey: 'global-duration-filter-value',
         },
+        views: {
+            statusKey: 'global-views-filter-status',
+            valueKey: 'global-views-filter-value',
+        },
         uploader: {
-            statusKey: 'search-uploader-filter-status',
+            statusKey: 'global-uploader-filter-status',
             valueKey: 'global-uploader-filter-value',
         },
         uploaderKeyword: {
-            statusKey: 'search-uploader-keyword-filter-status',
+            statusKey: 'global-uploader-keyword-filter-status',
             valueKey: 'global-uploader-keyword-filter-value',
         },
         title: {
-            statusKey: 'search-title-keyword-filter-status',
+            statusKey: 'global-title-keyword-filter-status',
             valueKey: 'global-title-keyword-filter-value',
         },
         partition: {
-            statusKey: 'search-partition-filter-status',
+            statusKey: 'global-partition-filter-status',
             valueKey: 'global-partition-filter-value',
         },
         partitionTag: {
-            statusKey: 'search-partition-tag-status',
+            statusKey: 'global-partition-tag-status',
         },
     },
     white: {
         uploader: {
-            statusKey: 'search-uploader-whitelist-filter-status',
+            statusKey: 'global-uploader-whitelist-filter-status',
             valueKey: 'global-uploader-whitelist-filter-value',
         },
     },
@@ -64,13 +70,25 @@ const selectorFns = {
         const duration = video.querySelector('.bili-video-card__stats__duration')?.textContent?.trim()
         return (duration && convertTimeToSec(duration)) ?? undefined
     },
+    views: (video: HTMLElement): SelectorResult => {
+        const text =
+            video.querySelector('.bili-video-card__stats--text')?.textContent?.trim() ||
+            video
+                .querySelector('.bili-video-card__stats--left .bili-video-card__stats--item:first-child')
+                ?.textContent?.trim()
+        const bvid = selectorFns.bvid(video)
+        return parseVideoViews(text) ?? (typeof bvid === 'string' ? searchViewsMap.get(bvid) : undefined)
+    },
     title: (video: HTMLElement): SelectorResult => {
         return video.querySelector('.bili-video-card__info--tit')?.textContent?.trim()
     },
     bvid: (video: HTMLElement): SelectorResult => {
         const href =
             video.querySelector('.bili-video-card__wrap > a')?.getAttribute('href') ||
-            video.querySelector('.bili-video-card__info--right > a')?.getAttribute('href')
+            video.querySelector('.bili-video-card__info--right > a')?.getAttribute('href') ||
+            video.querySelector('.bili-video-card__image--link')?.getAttribute('href') ||
+            video.querySelector('.bili-video-card__info--tit a')?.getAttribute('href') ||
+            video.querySelector('a[href*="/video/"]')?.getAttribute('href')
         return (href && matchBvid(href)) ?? undefined
     },
     uploader: (video: HTMLElement): SelectorResult => {
@@ -90,6 +108,7 @@ const selectorFns = {
 
 // 搜索结果 分区缓存数据 (bvid -> `${typeid}|${typename}`)，通过hook搜索结果接口获取
 const searchPartitionMap = new Map<string, string>()
+const searchViewsMap = new Map<string, number>()
 let searchPartitionHookInited = false
 const initSearchPartitionHook = () => {
     if (searchPartitionHookInited) {
@@ -98,7 +117,8 @@ const initSearchPartitionHook = () => {
     searchPartitionHookInited = true
     fetchHook.addPostFn(async (input, _init, resp) => {
         try {
-            if (typeof input !== 'string' || !input.includes('search/type')) {
+            const url = typeof input === 'string' ? input : 'url' in input ? input.url : input.toString()
+            if (!url.includes('search/type') && !url.includes('search/all/v2')) {
                 return
             }
             const data: any = await resp?.clone().json()
@@ -106,11 +126,24 @@ const initSearchPartitionHook = () => {
             if (!Array.isArray(result)) {
                 return
             }
-            for (const v of result) {
+            const videos = result.flatMap((item: any) => (Array.isArray(item?.result) ? item.result : [item]))
+            for (const v of videos) {
                 if (v?.bvid && (v.typeid || v.typename)) {
                     searchPartitionMap.set(v.bvid, [v.typeid, v.typename].join('|'))
                 }
+                if (v?.bvid) {
+                    const views =
+                        typeof v.play === 'number'
+                            ? v.play
+                            : typeof v.play === 'string'
+                              ? parseVideoViews(v.play)
+                              : undefined
+                    if (typeof views === 'number') {
+                        searchViewsMap.set(v.bvid, views)
+                    }
+                }
             }
+            mainFilter.checkFull()
         } catch (err) {
             logger.error('search partition hook error', err)
         }
@@ -122,6 +155,7 @@ class VideoFilterSearch implements IMainFilter {
 
     // 黑名单
     videoDurationFilter = new VideoDurationFilter()
+    videoViewsFilter = new VideoViewsFilter()
     videoTitleFilter = new VideoTitleFilter()
     videoUploaderFilter = new VideoUploaderFilter()
     videoUploaderKeywordFilter = new VideoUploaderKeywordFilter()
@@ -135,6 +169,7 @@ class VideoFilterSearch implements IMainFilter {
     init() {
         // 黑名单
         this.videoDurationFilter.setParam(GM_getValue(GM_KEYS.black.duration.valueKey, 0))
+        this.videoViewsFilter.setParam(GM_getValue(GM_KEYS.black.views.valueKey, 0))
         this.videoTitleFilter.setParam(GM_getValue(GM_KEYS.black.title.valueKey, []))
         this.videoUploaderFilter.setParam(GM_getValue(GM_KEYS.black.uploader.valueKey, []))
         this.videoUploaderKeywordFilter.setParam(GM_getValue(GM_KEYS.black.uploaderKeyword.valueKey, []))
@@ -150,6 +185,7 @@ class VideoFilterSearch implements IMainFilter {
         let revertAll = false
         if (!(
             this.videoDurationFilter.isEnable ||
+            this.videoViewsFilter.isEnable ||
             this.videoTitleFilter.isEnable ||
             this.videoUploaderFilter.isEnable ||
             this.videoUploaderKeywordFilter.isEnable ||
@@ -183,6 +219,7 @@ class VideoFilterSearch implements IMainFilter {
                     [
                         `VideoFilterSearch`,
                         `duration: ${selectorFns.duration(v)}`,
+                        `views: ${selectorFns.views(v)}`,
                         `title: ${selectorFns.title(v)}`,
                         `uploader: ${selectorFns.uploader(v)}`,
                         `partition: ${selectorFns.partition(v)}`,
@@ -194,6 +231,7 @@ class VideoFilterSearch implements IMainFilter {
         // 构建黑白检测任务
         const blackPairs: SubFilterPair[] = []
         this.videoDurationFilter.isEnable && blackPairs.push([this.videoDurationFilter, selectorFns.duration])
+        this.videoViewsFilter.isEnable && blackPairs.push([this.videoViewsFilter, selectorFns.views])
         this.videoTitleFilter.isEnable && blackPairs.push([this.videoTitleFilter, selectorFns.title])
         this.videoUploaderFilter.isEnable && blackPairs.push([this.videoUploaderFilter, selectorFns.uploader])
         this.videoUploaderKeywordFilter.isEnable &&
@@ -336,6 +374,43 @@ export const videoFilterSearchGroups: Group[] = [
         ],
     },
     {
+        name: '播放量过滤',
+        fold: true,
+        items: [
+            {
+                type: 'switch',
+                id: GM_KEYS.black.views.statusKey,
+                name: '启用 播放量过滤',
+                description: ['开关和最低播放量全站共用'],
+                noStyle: true,
+                enableFn: () => {
+                    mainFilter.videoViewsFilter.enable()
+                    mainFilter.checkFull()
+                },
+                disableFn: () => {
+                    mainFilter.videoViewsFilter.disable()
+                    mainFilter.checkFull()
+                },
+            },
+            {
+                type: 'number',
+                id: GM_KEYS.black.views.valueKey,
+                name: '设定最低播放量（0~10万）',
+                noStyle: true,
+                minValue: 0,
+                maxValue: 100000,
+                step: 1,
+                defaultValue: 0,
+                disableValue: 0,
+                addonText: '次',
+                fn: (value: number) => {
+                    mainFilter.videoViewsFilter.setParam(value)
+                    mainFilter.checkFull()
+                },
+            },
+        ],
+    },
+    {
         name: 'UP主过滤',
         items: [
             {
@@ -455,7 +530,7 @@ export const videoFilterSearchGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.partition.valueKey,
                 name: '编辑 分区黑名单',
-                description: ['黑名单内容全站共用，开关仅对本页生效'],
+                description: ['开关和黑名单内容全站共用'],
                 editorTitle: '分区 黑名单',
                 editorDescription: [
                     '启用后，右键视频卡片可快捷屏蔽分区',

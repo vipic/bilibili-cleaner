@@ -4,6 +4,7 @@ import { logger } from '@/utils/logger'
 import { GM_getValue } from '$'
 import { useMagicKeys } from '@vueuse/core'
 import { articleFilters, commentFilters, dynamicFilters, loadFilterStyle, videoFilters } from './filters'
+import { migrateVideoFilterSettings } from './filters/variety/video/settings'
 import { loadRuleStyle, rules } from './rules'
 
 const loadSwitchItem = (item: ISwitchItem) => {
@@ -91,6 +92,7 @@ const loadRules = () => {
 
 /** 载入过滤器 */
 const loadFilters = () => {
+    migrateVideoFilterSettings()
     const filters = [...videoFilters, ...commentFilters, ...dynamicFilters, ...articleFilters]
     for (const filter of filters) {
         if (filter.checkFn()) {

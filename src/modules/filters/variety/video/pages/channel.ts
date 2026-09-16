@@ -19,29 +19,29 @@ import { VideoUploaderWhiteFilter } from '../subFilters/white'
 const GM_KEYS = {
     black: {
         duration: {
-            statusKey: 'channel-duration-filter-status',
+            statusKey: 'global-duration-filter-status',
             valueKey: 'global-duration-filter-value',
         },
         uploader: {
-            statusKey: 'channel-uploader-filter-status',
+            statusKey: 'global-uploader-filter-status',
             valueKey: 'global-uploader-filter-value',
         },
         uploaderKeyword: {
-            statusKey: 'channel-uploader-keyword-filter-status',
+            statusKey: 'global-uploader-keyword-filter-status',
             valueKey: 'global-uploader-keyword-filter-value',
         },
         pubdate: {
-            statusKey: 'channel-pubdate-filter-status',
+            statusKey: 'global-pubdate-filter-status',
             valueKey: 'global-pubdate-filter-value',
         },
         title: {
-            statusKey: 'channel-title-keyword-filter-status',
+            statusKey: 'global-title-keyword-filter-status',
             valueKey: 'global-title-keyword-filter-value',
         },
     },
     white: {
         uploader: {
-            statusKey: 'channel-uploader-whitelist-filter-status',
+            statusKey: 'global-uploader-whitelist-filter-status',
             valueKey: 'global-uploader-whitelist-filter-value',
         },
     },

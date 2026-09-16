@@ -37,7 +37,7 @@ import PanelComp from '@/components/PanelComp.vue'
 import { videoFilters } from '@/modules/filters'
 import { useVideoFilterPanelStore } from '@/stores/view'
 import { Group } from '@/types/collection'
-import { IEditorItem } from '@/types/item'
+import { IEditorItem, Item } from '@/types/item'
 import { ref } from 'vue'
 
 const store = useVideoFilterPanelStore()
@@ -47,11 +47,54 @@ const handleEdit = (item: IEditorItem) => {
     editorDialogRef.value?.openEditor(item)
 }
 
-let currPageGroups: Group[] = []
-
-for (const videoFilter of videoFilters) {
-    if (videoFilter.checkFn()) {
-        currPageGroups = [...currPageGroups, ...videoFilter.groups]
+const chainItemAction = (current: Item, incoming: Item) => {
+    if (current.type === 'switch' && incoming.type === 'switch') {
+        const enableFn = current.enableFn
+        const disableFn = current.disableFn
+        current.enableFn = async () => {
+            await enableFn?.()
+            await incoming.enableFn?.()
+        }
+        current.disableFn = async () => {
+            await disableFn?.()
+            await incoming.disableFn?.()
+        }
+    } else if (current.type === 'number' && incoming.type === 'number') {
+        const fn = current.fn
+        current.fn = async (value: number) => {
+            await fn(value)
+            await incoming.fn(value)
+        }
+    } else if (current.type === 'editor' && incoming.type === 'editor') {
+        const saveFn = current.saveFn
+        current.saveFn = async () => {
+            await saveFn()
+            await incoming.saveFn()
+        }
     }
 }
+
+const buildGlobalGroups = (): Group[] => {
+    const groups = new Map<string, Group>()
+    for (const videoFilter of videoFilters) {
+        for (const sourceGroup of videoFilter.groups) {
+            let targetGroup = groups.get(sourceGroup.name)
+            if (!targetGroup) {
+                targetGroup = { ...sourceGroup, items: [] }
+                groups.set(sourceGroup.name, targetGroup)
+            }
+            for (const sourceItem of sourceGroup.items) {
+                const targetItem = targetGroup.items.find((item) => item.id === sourceItem.id)
+                if (targetItem) {
+                    chainItemAction(targetItem, sourceItem)
+                } else {
+                    targetGroup.items.push({ ...sourceItem })
+                }
+            }
+        }
+    }
+    return [...groups.values()]
+}
+
+const currPageGroups = buildGlobalGroups()
 </script>

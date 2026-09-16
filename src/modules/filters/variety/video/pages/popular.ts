@@ -15,6 +15,7 @@ import {
     VideoTitleFilter,
     VideoUploaderFilter,
     VideoUploaderKeywordFilter,
+    VideoViewsFilter,
 } from '../subFilters/black'
 import { VideoUploaderWhiteFilter } from '../subFilters/white'
 import {
@@ -28,19 +29,23 @@ import {
 const GM_KEYS = {
     black: {
         duration: {
-            statusKey: 'popular-duration-filter-status',
+            statusKey: 'global-duration-filter-status',
             valueKey: 'global-duration-filter-value',
         },
+        views: {
+            statusKey: 'global-views-filter-status',
+            valueKey: 'global-views-filter-value',
+        },
         uploader: {
-            statusKey: 'popular-uploader-filter-status',
+            statusKey: 'global-uploader-filter-status',
             valueKey: 'global-uploader-filter-value',
         },
         uploaderKeyword: {
-            statusKey: 'popular-uploader-keyword-filter-status',
+            statusKey: 'global-uploader-keyword-filter-status',
             valueKey: 'global-uploader-keyword-filter-value',
         },
         title: {
-            statusKey: 'popular-title-keyword-filter-status',
+            statusKey: 'global-title-keyword-filter-status',
             valueKey: 'global-title-keyword-filter-value',
         },
         quality: {
@@ -51,16 +56,16 @@ const GM_KEYS = {
             statusKey: 'popular-dimension-filter-status',
         },
         partition: {
-            statusKey: 'popular-partition-filter-status',
+            statusKey: 'global-partition-filter-status',
             valueKey: 'global-partition-filter-value',
         },
         partitionTag: {
-            statusKey: 'popular-partition-tag-status',
+            statusKey: 'global-partition-tag-status',
         },
     },
     white: {
         uploader: {
-            statusKey: 'popular-uploader-whitelist-filter-status',
+            statusKey: 'global-uploader-whitelist-filter-status',
             valueKey: 'global-uploader-whitelist-filter-value',
         },
     },
@@ -90,6 +95,10 @@ const selectorFns = {
     duration: (video: HTMLElement): SelectorResult => {
         return getVideoData(video)?.duration
     },
+    views: (video: HTMLElement): SelectorResult => {
+        const views = getVideoData(video)?.stat?.view
+        return typeof views === 'number' ? views : undefined
+    },
     quality: (video: HTMLElement): SelectorResult => {
         const stat = getVideoData(video)?.stat
         if (stat && typeof stat.coin === 'number' && typeof stat.like === 'number') {
@@ -116,6 +125,7 @@ class VideoFilterPopular implements IMainFilter {
 
     // 黑名单
     videoDurationFilter = new VideoDurationFilter()
+    videoViewsFilter = new VideoViewsFilter()
     videoTitleFilter = new VideoTitleFilter()
     videoUploaderFilter = new VideoUploaderFilter()
     videoUploaderKeywordFilter = new VideoUploaderKeywordFilter()
@@ -130,6 +140,7 @@ class VideoFilterPopular implements IMainFilter {
     init() {
         // 黑名单
         this.videoDurationFilter.setParam(GM_getValue(GM_KEYS.black.duration.valueKey, 0))
+        this.videoViewsFilter.setParam(GM_getValue(GM_KEYS.black.views.valueKey, 0))
         this.videoTitleFilter.setParam(GM_getValue(GM_KEYS.black.title.valueKey, []))
         this.videoUploaderFilter.setParam(GM_getValue(GM_KEYS.black.uploader.valueKey, []))
         this.videoUploaderKeywordFilter.setParam(GM_getValue(GM_KEYS.black.uploaderKeyword.valueKey, []))
@@ -146,6 +157,7 @@ class VideoFilterPopular implements IMainFilter {
         let revertAll = false
         if (!(
             this.videoDurationFilter.isEnable ||
+            this.videoViewsFilter.isEnable ||
             this.videoTitleFilter.isEnable ||
             this.videoUploaderFilter.isEnable ||
             this.videoUploaderKeywordFilter.isEnable ||
@@ -176,6 +188,7 @@ class VideoFilterPopular implements IMainFilter {
                     [
                         `VideoFilterPopular`,
                         `duration: ${selectorFns.duration(v)}`,
+                        `views: ${selectorFns.views(v)}`,
                         `title: ${selectorFns.title(v)}`,
                         `uploader: ${selectorFns.uploader(v)}`,
                         `quality: ${selectorFns.quality(v)}`,
@@ -188,6 +201,7 @@ class VideoFilterPopular implements IMainFilter {
         // 构建黑白检测任务
         const blackPairs: SubFilterPair[] = []
         this.videoDurationFilter.isEnable && blackPairs.push([this.videoDurationFilter, selectorFns.duration])
+        this.videoViewsFilter.isEnable && blackPairs.push([this.videoViewsFilter, selectorFns.views])
         this.videoTitleFilter.isEnable && blackPairs.push([this.videoTitleFilter, selectorFns.title])
         this.videoUploaderFilter.isEnable && blackPairs.push([this.videoUploaderFilter, selectorFns.uploader])
         this.videoUploaderKeywordFilter.isEnable &&
@@ -277,6 +291,43 @@ export const videoFilterPopularGroups: Group[] = [
                 addonText: '秒',
                 fn: (value: number) => {
                     mainFilter.videoDurationFilter.setParam(value)
+                    mainFilter.checkFull()
+                },
+            },
+        ],
+    },
+    {
+        name: '播放量过滤',
+        fold: true,
+        items: [
+            {
+                type: 'switch',
+                id: GM_KEYS.black.views.statusKey,
+                name: '启用 播放量过滤',
+                description: ['开关和最低播放量全站共用'],
+                noStyle: true,
+                enableFn: () => {
+                    mainFilter.videoViewsFilter.enable()
+                    mainFilter.checkFull()
+                },
+                disableFn: () => {
+                    mainFilter.videoViewsFilter.disable()
+                    mainFilter.checkFull()
+                },
+            },
+            {
+                type: 'number',
+                id: GM_KEYS.black.views.valueKey,
+                name: '设定最低播放量（0~10万）',
+                noStyle: true,
+                minValue: 0,
+                maxValue: 100000,
+                step: 1,
+                defaultValue: 0,
+                disableValue: 0,
+                addonText: '次',
+                fn: (value: number) => {
+                    mainFilter.videoViewsFilter.setParam(value)
                     mainFilter.checkFull()
                 },
             },
@@ -452,7 +503,7 @@ export const videoFilterPopularGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.partition.valueKey,
                 name: '编辑 分区黑名单',
-                description: ['黑名单内容全站共用，开关仅对本页生效', '数据来自页面缓存，可能缺少个别视频分区'],
+                description: ['开关和黑名单内容全站共用', '数据来自页面缓存，可能缺少个别视频分区'],
                 editorTitle: '分区 黑名单',
                 editorDescription: [
                     '启用后，右键视频卡片可快捷屏蔽分区',

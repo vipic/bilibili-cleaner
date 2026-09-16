@@ -12,11 +12,11 @@ import { VideoDurationFilter, VideoTitleFilter } from '../subFilters/black'
 const GM_KEYS = {
     black: {
         duration: {
-            statusKey: 'space-duration-filter-status',
+            statusKey: 'global-duration-filter-status',
             valueKey: 'global-duration-filter-value',
         },
         title: {
-            statusKey: 'space-title-keyword-filter-status',
+            statusKey: 'global-title-keyword-filter-status',
             valueKey: 'global-title-keyword-filter-value',
         },
     },

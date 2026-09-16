@@ -25,44 +25,45 @@ import {
     setPartitionTag,
 } from '../partition'
 import { ensurePartition, getPartition } from '../homepagePartition'
+import { parseVideoViews } from '../views'
 
 const GM_KEYS = {
     black: {
         duration: {
-            statusKey: 'homepage-duration-filter-status',
+            statusKey: 'global-duration-filter-status',
             valueKey: 'global-duration-filter-value',
         },
         views: {
-            statusKey: 'homepage-views-filter-status',
+            statusKey: 'global-views-filter-status',
             valueKey: 'global-views-filter-value',
         },
         uploader: {
-            statusKey: 'homepage-uploader-filter-status',
+            statusKey: 'global-uploader-filter-status',
             valueKey: 'global-uploader-filter-value',
         },
         uploaderKeyword: {
-            statusKey: 'homepage-uploader-keyword-filter-status',
+            statusKey: 'global-uploader-keyword-filter-status',
             valueKey: 'global-uploader-keyword-filter-value',
         },
         pubdate: {
-            statusKey: 'homepage-pubdate-filter-status',
+            statusKey: 'global-pubdate-filter-status',
             valueKey: 'global-pubdate-filter-value',
         },
         title: {
-            statusKey: 'homepage-title-keyword-filter-status',
+            statusKey: 'global-title-keyword-filter-status',
             valueKey: 'global-title-keyword-filter-value',
         },
         partition: {
-            statusKey: 'homepage-partition-filter-status',
+            statusKey: 'global-partition-filter-status',
             valueKey: 'global-partition-filter-value',
         },
         partitionTag: {
-            statusKey: 'homepage-partition-tag-status',
+            statusKey: 'global-partition-tag-status',
         },
     },
     white: {
         uploader: {
-            statusKey: 'homepage-uploader-whitelist-filter-status',
+            statusKey: 'global-uploader-whitelist-filter-status',
             valueKey: 'global-uploader-whitelist-filter-value',
         },
         isFollow: {
@@ -79,15 +80,7 @@ const selectorFns = {
     },
     views: (video: HTMLElement): SelectorResult => {
         const text = video.querySelector('.bili-video-card__stats--text')?.textContent?.trim()
-        if (text) {
-            if (/\d+(?:\.\d+)?万/.test(text)) {
-                return parseFloat(text.replace('万', '')) * 10000
-            }
-            if (/^\d+$/.test(text)) {
-                return parseFloat(text)
-            }
-        }
-        return undefined
+        return parseVideoViews(text)
     },
     title: (video: HTMLElement): SelectorResult => {
         return video.querySelector('.bili-video-card__info--tit a')?.textContent?.trim()
@@ -535,10 +528,7 @@ export const videoFilterHomepageGroups: Group[] = [
                 type: 'editor',
                 id: GM_KEYS.black.partition.valueKey,
                 name: '编辑 分区黑名单',
-                description: [
-                    '黑名单内容全站共用，开关仅对本页生效',
-                    '首页推荐数据不含分区，需按视频请求接口，首次加载稍慢',
-                ],
+                description: ['开关和黑名单内容全站共用', '首页推荐数据不含分区，需按视频请求接口，首次加载稍慢'],
                 editorTitle: '分区 黑名单',
                 editorDescription: [
                     '启用后，右键视频卡片可快捷屏蔽分区',
