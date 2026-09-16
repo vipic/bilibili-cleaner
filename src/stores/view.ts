@@ -51,8 +51,7 @@ export const useVideoFilterPanelStore = defineStore('VideoFilterPanel', () => {
             isPagePlaylist() ||
             isPagePopular() ||
             isPageChannel() ||
-            isPageSearch() ||
-            isPageSpace()
+            isPageSearch()
         )
     }
     return { isShow, show, hide, toggle, isPageValid }

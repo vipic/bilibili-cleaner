@@ -41,7 +41,6 @@ import {
     videoFilterPopularHandler,
 } from './variety/video/pages/popular'
 import { videoFilterSearchEntry, videoFilterSearchGroups, videoFilterSearchHandler } from './variety/video/pages/search'
-import { videoFilterSpaceEntry, videoFilterSpaceGroups, videoFilterSpaceHandler } from './variety/video/pages/space'
 import { videoFilterVideoEntry, videoFilterVideoGroups, videoFilterVideoHandler } from './variety/video/pages/video'
 import { articleFilterEntry, articleFilterGroups, articleFilterHandler } from './variety/article'
 
@@ -76,12 +75,6 @@ export const videoFilters: Filter[] = [
         groups: videoFilterSearchGroups,
         entry: videoFilterSearchEntry,
         checkFn: isPageSearch,
-    },
-    {
-        name: '空间页 视频过滤',
-        groups: videoFilterSpaceGroups,
-        entry: videoFilterSpaceEntry,
-        checkFn: isPageSpace,
     },
 ]
 
@@ -173,7 +166,6 @@ export const filterContextMenuHandlers = [
     videoFilterChannelHandler,
     videoFilterPopularHandler,
     videoFilterHomepageHandler,
-    videoFilterSpaceHandler,
     dynamicFilterDynamicHandler,
     commentFilterCommonHandler,
     articleFilterHandler,
