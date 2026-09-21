@@ -8,7 +8,6 @@
         "build": "vue-tsc -b && vite build",
         "prepare": "husky"
     },
-    "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c",
     "dependencies": {
         "@headlessui/vue": "^1.7.23",
         "@heroicons/vue": "^2.2.0",
@@ -16,39 +15,42 @@
         "@vueuse/core": "^14.4.0",
         "@vueuse/integrations": "^14.4.0",
         "emoji-regex-xs": "^2.0.1",
-        "p-limit": "^7.3.1",
+        "n-gram": "^2.0.2",
+        "p-limit": "^7.3.2",
         "pinia": "^3.0.4",
         "tailwindcss": "^4.3.3",
         "universal-cookie": "^8.1.2",
-        "vue": "^3.5.40"
+        "vue": "^3.5.42"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@thedutchcoder/postcss-rem-to-px": "^0.0.2",
-        "@types/node": "^25.9.5",
-        "@vitejs/plugin-vue": "^6.0.8",
-        "autoprefixer": "^10.5.4",
-        "eslint": "^10.8.0",
+        "@types/node": "^25.9.7",
+        "@vitejs/plugin-vue": "^6.0.9",
+        "eslint": "^10.10.0",
         "eslint-config-prettier": "^10.1.8",
-        "eslint-plugin-vue": "^10.10.0",
-        "globals": "^17.8.0",
+        "eslint-plugin-vue": "^10.11.0",
+        "globals": "^17.12.0",
         "husky": "^9.1.7",
-        "lint-staged": "^17.2.0",
-        "prettier": "^3.9.6",
+        "jsdom": "^30.0.1",
+        "lint-staged": "^17.5.1",
+        "prettier": "^3.9.7",
         "prettier-plugin-tailwindcss": "^0.8.1",
-        "sass-embedded": "^1.100.0",
-        "stylelint": "^17.14.1",
+        "sass-embedded": "^1.104.1",
+        "stylelint": "^17.15.0",
         "stylelint-config-standard-scss": "^17.0.0",
         "typescript": "^6.0.3",
-        "typescript-eslint": "^8.65.0",
-        "vite": "^8.1.5",
-        "vite-plugin-monkey": "^8.1.0",
+        "typescript-eslint": "^8.70.0",
+        "vite": "^8.3.0",
+        "vite-plugin-monkey": "^8.1.1",
         "vite-plugin-tailwind-shadowdom": "^1.1.1",
-        "vue-tsc": "^3.3.8"
+        "vitest": "^4.1.11",
+        "vue-tsc": "^3.3.11"
     },
     "lint-staged": {
         "src/**/*": "prettier --write --ignore-unknown",
-        "src/**/*.{js,mjs,cjs,ts,vue}": "npx eslint --fix",
-        "src/**/*.scss": "npx stylelint --fix"
-    }
+        "src/**/*.{js,mjs,cjs,ts,jsx,tsx,vue}": "eslint --fix",
+        "src/**/*.scss": "stylelint --fix"
+    },
+    "packageManager": "pnpm@12.3.4"
 }

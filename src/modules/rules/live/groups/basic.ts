@@ -47,6 +47,7 @@ export const liveBasicItems: Item[] = [
         id: 'live-page-remove-wallpaper',
         name: '禁用 直播背景',
     },
+
     {
         type: 'switch',
         id: 'activity-live-auto-jump',

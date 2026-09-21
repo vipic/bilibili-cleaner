@@ -1,6 +1,6 @@
 import { unsafeWindow } from '$'
 import { Item } from '@/types/item'
-import { playerGoTo, waitForEle } from '@/utils/tool'
+import { isEditableEvent, playerGoTo, waitForEle } from '@/utils/tool'
 import { wideScreenManager } from '@/utils/widePlayer'
 import { useEventListener } from '@vueuse/core'
 
@@ -29,6 +29,11 @@ for (const eventName of ['mousewheel', 'DOMMouseScroll', 'wheel']) {
         window,
         eventName,
         (e: WheelEvent) => {
+            // 选集区域允许滚动
+            const target = e.target as HTMLElement
+            if (typeof target.className === 'string' && target.className.startsWith('bpx-player-ctrl-eplist')) {
+                return
+            }
             if (preventVolumeTune && isWebScreen() && !isMiniScreen()) {
                 e.stopImmediatePropagation()
             }
@@ -92,6 +97,19 @@ const handleFullScreenDblClick = (e: MouseEvent) => {
         document.querySelector<HTMLVideoElement>('#bilibili-player video')?.pause()
         toggleFullScreen()
     }
+}
+
+// 拦截 F 键全屏
+const handleKeyFPress = (e: KeyboardEvent) => {
+    if (e.key.toLocaleLowerCase() !== 'f' || e.ctrlKey || e.altKey || e.metaKey) {
+        return
+    }
+    if (isEditableEvent(e)) {
+        return
+    }
+    e.stopImmediatePropagation()
+    e.preventDefault()
+    toggleFullScreen()
 }
 
 export const videoPlayerLayoutItems: Item[] = [
@@ -197,6 +215,18 @@ export const videoPlayerLayoutItems: Item[] = [
             preventVolumeTune = false
             document.removeEventListener('click', handleFullScreenClick, true)
             document.removeEventListener('dblclick', handleFullScreenDblClick, true)
+        },
+    },
+    {
+        type: 'switch',
+        id: 'fullscreen-key-f-scrollable',
+        name: '按 F 键全屏可滚动',
+        description: ['需同时启用真全屏页面滚动'],
+        enableFn: () => {
+            window.addEventListener('keydown', handleKeyFPress, true)
+        },
+        disableFn: () => {
+            window.removeEventListener('keydown', handleKeyFPress, true)
         },
     },
     {

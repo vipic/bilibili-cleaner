@@ -22,6 +22,7 @@ export const videoRightItems: Item[] = [
         type: 'switch',
         id: 'video-page-hide-right-container-video-page-game-card-small',
         name: '隐藏 游戏推荐',
+        defaultEnable: true,
     },
     {
         type: 'switch',
@@ -73,11 +74,6 @@ export const videoRightItems: Item[] = [
         id: 'video-page-hide-right-container-section-height',
         name: '优化 视频合集 列表高度',
         defaultEnable: true,
-    },
-    {
-        type: 'switch',
-        id: 'video-page-hide-right-container-section-next-btn',
-        name: '隐藏 视频合集 自动连播开关',
     },
     {
         type: 'switch',

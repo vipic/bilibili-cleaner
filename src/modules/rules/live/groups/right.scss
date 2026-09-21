@@ -190,27 +190,7 @@ html[live-page-brush-prompt] {
 
 // 隐藏 互动框
 html[live-page-combo-card] {
-    // 倒计时互动
-    #combo-card:has(.countDownBtn),
-    .gift-wish-card-root {
-        display: none !important;
-    }
-    .chat-history-panel {
-        padding-bottom: 0 !important;
-    }
-
-    // 他们都在说
-    #combo-card:has(.combo-tips) {
-        display: none !important;
-    }
-
-    // 找TA玩
-    .play-together-service-card-container {
-        display: none !important;
-    }
-
-    // 投票
-    .vote-card {
+    #relocated-cards-area {
         display: none !important;
     }
 }
