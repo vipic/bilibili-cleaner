@@ -1,0 +1,7 @@
+import { fileURLToPath, URL } from 'node:url'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+    resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)), '$': 'vite-plugin-monkey/dist/client' } },
+    test: { include: ['tests/**/*.test.ts'], environment: 'node' },
+})

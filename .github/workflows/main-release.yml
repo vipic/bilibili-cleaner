@@ -25,7 +25,7 @@ jobs:
             # build and save
             - name: build and save file
               run: |
-                  pnpm run build
+                  pnpm run check
                   rm -rf release && mkdir release
                   cp dist/bilibili-cleaner.user.js release/
 

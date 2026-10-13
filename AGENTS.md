@@ -5,7 +5,7 @@
 ## 项目约定
 
 - 安装依赖和构建沿用仓库锁定的 pnpm，不替换 Vue/Vite/vite-plugin-monkey 发布链路。
-- 标准验证命令是 `pnpm build`，同时执行 `vue-tsc -b` 与 Vite 构建。
+- 标准验证命令是 `pnpm check`，执行过滤器纯逻辑测试与 `pnpm build`（`vue-tsc -b` 和 Vite 构建）。
 - 用户脚本元数据维护在 `vite.config.ts`；当前可见版本取 `userscript.version`，不是 `package.json` 中的占位版本。
 - 用户可见改动按语义版本规则同步更新 `userscript.version`；纯文档与 Agent 规则调整不升版本。
 - 不扩大 userscript 的 `match`、远程资源或页面权限范围，除非用户明确要求并完成安全审查。

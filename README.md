@@ -273,6 +273,6 @@ Firefox 无需操作，Edge / Chrome 操作如下：
     1. clone 项目，`pnpm i` 安装依赖
     2. 使用 `pnpm dev` 进入 dev 模式，会自动打开浏览器安装开发用脚本（由 vite-plugin-monkey 控制）
         - dev 模式下，修改 vue/scss 代码并保存时可实时生效，修改 typescript 会触发页面自动刷新
-    3. 使用 `pnpm build` 构建，产物在 `dist` 文件夹内
+    3. 使用 `pnpm check` 执行过滤器行为测试与构建，产物在 `dist` 文件夹内；`pnpm test` 可单独运行纯逻辑测试，不依赖 Bilibili 页面
 
 </details>

@@ -6,7 +6,9 @@
     "scripts": {
         "dev": "vite",
         "build": "vue-tsc -b && vite build",
-        "prepare": "husky"
+        "prepare": "husky",
+        "test": "vitest run",
+        "check": "pnpm test && pnpm build"
     },
     "dependencies": {
         "@headlessui/vue": "^1.7.23",

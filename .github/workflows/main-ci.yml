@@ -23,7 +23,7 @@ jobs:
 
             # build
             - name: build
-              run: pnpm run build
+              run: pnpm run check
             - name: add doc
               run: cp LICENSE README.md CHANGELOG.md dist/
             - name: list files
