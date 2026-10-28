@@ -1,10 +1,15 @@
-// 隐藏 每周必看 / 入站必刷 / 全站音乐榜 / 手游热榜 Tab
-// 以及 排行榜 下的部分分类 Tab，标记见 extraTabs.ts
+// 隐藏 每周必看 / 入站必刷 / 全站音乐榜 / 手游热榜 / 排行榜 Tab
+// 以及 排行榜 分类行中不需要的分类 Tab，标记见 extraTabs.ts
 html[popular-hide-extra-tabs] {
-    .nav-tabs .nav-tabs__item.bili-cleaner-hide-tab,
-    .rank-tab-wrap .rank-tab > li.bili-cleaner-hide-tab {
+    .nav-tabs .nav-tabs__item[bili-cleaner-hide-tab],
+    .rank-tab-wrap .rank-tab > li[bili-cleaner-hide-tab] {
         display: none !important;
     }
+}
+
+// 排行榜分类已置顶为一级 Tab 后，隐藏原分类 Tab 行
+html[popular-hide-extra-tabs].bili-cleaner-rank-nav-ready .rank-tab-wrap {
+    display: none !important;
 }
 
 // 隐藏 视频tag (人气飙升/1万点赞)
