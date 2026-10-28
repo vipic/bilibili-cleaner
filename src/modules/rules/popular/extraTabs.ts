@@ -14,6 +14,10 @@ const hiddenRankTabNames = new Set([
     '时尚美妆',
     '体育运动',
     '动物',
+    '汽车',
+    '美食',
+    '鬼畜',
+    '舞蹈',
 ])
 
 /** 隐藏 Tab 时添加的 class，供样式表匹配 */
